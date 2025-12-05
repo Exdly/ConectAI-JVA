@@ -10,9 +10,14 @@ import traceback
 import html
 import re
 import os
+import sys
 
 # Obtener el directorio base del archivo app.py
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Agregar el directorio base al path de Python para que encuentre los módulos
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
 
 # Configurar rutas para templates y static dentro de back-end/
 TEMPLATE_FOLDER = os.path.join(BASE_DIR, 'templates')

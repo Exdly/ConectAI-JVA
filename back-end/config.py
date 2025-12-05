@@ -74,7 +74,17 @@ GOOGLE_CLIENT_ID = "100818622156-fcjmhg1afp3nkfrdjtmrhi2ebvo08lkt.apps.googleuse
 GOOGLE_CLIENT_SECRET = "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"
 
 # URI de redirección para el flujo OAuth (debe coincidir con la configurada en Google Cloud)
-OAUTH_REDIRECT_URI = "http://localhost:5000/oauth2callback"
+# Detectar si estamos en Vercel y usar la URL correcta
+import os
+if os.environ.get('VERCEL_URL'):
+    # En Vercel, usar la URL del deployment
+    OAUTH_REDIRECT_URI = f"https://{os.environ.get('VERCEL_URL')}/oauth2callback"
+elif os.environ.get('VERCEL'):
+    # Fallback para Vercel sin VERCEL_URL
+    OAUTH_REDIRECT_URI = "https://conect-ai-jva.vercel.app/oauth2callback"
+else:
+    # Desarrollo local
+    OAUTH_REDIRECT_URI = "http://localhost:5000/oauth2callback"
 
 # =============================================================================
 # CONFIGURACIÓN DEL SERVIDOR

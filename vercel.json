@@ -1,0 +1,27 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "back-end/app.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "back-end/app.py"
+    },
+    {
+      "src": "/oauth2callback",
+      "dest": "back-end/app.py"
+    },
+    {
+      "src": "/static/(.*)",
+      "dest": "back-end/app.py"
+    },
+    {
+      "src": "/",
+      "dest": "back-end/app.py"
+    }
+  ]
+}
