@@ -4,7 +4,7 @@ Servidor Principal - IESTP Juan Velasco Alvarado
 Backend Flask para el chatbot de trámites académicos.
 """
 
-from flask import Flask, request, jsonify, redirect
+from flask import Flask, request, jsonify, redirect, render_template, send_from_directory
 from flask_cors import CORS
 import traceback
 import html
@@ -45,7 +45,7 @@ from google_sheets import get_sheets_manager
 from ai_manager import get_ai_manager
 from web_scraper import get_web_scraper
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='../', template_folder='../', static_url_path='')
 
 CORS(app, resources={
     r"/api/*": {
@@ -58,6 +58,10 @@ CORS(app, resources={
 # =============================================================================
 # ENDPOINTS DE AUTENTICACIÓN
 # =============================================================================
+
+@app.route('/')
+def index():
+    return render_template('index.html')
 
 @app.route('/api/auth/status', methods=['GET'])
 def auth_status():
