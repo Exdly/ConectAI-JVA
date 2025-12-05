@@ -19,6 +19,8 @@ TEMPLATE_FOLDER = os.path.join(BASE_DIR, 'templates')
 STATIC_FOLDER = os.path.join(BASE_DIR, 'static')
 
 
+
+
 # Constantes de validación
 MAX_MESSAGE_LENGTH = 2000  # Máximo de caracteres por mensaje
 
