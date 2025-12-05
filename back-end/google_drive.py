@@ -32,13 +32,19 @@ SCOPES = [
 ]
 
 
-def get_authorization_url() -> str:
-    """Genera la URL para que el usuario autorice la aplicación."""
+def get_authorization_url(custom_redirect_uri: str = None) -> str:
+    """Genera la URL para que el usuario autorice la aplicación.
+    
+    Args:
+        custom_redirect_uri: URI de redirección personalizada (opcional)
+    """
     from urllib.parse import urlencode
+    
+    redirect_uri = custom_redirect_uri or OAUTH_REDIRECT_URI
     
     params = {
         'client_id': GOOGLE_CLIENT_ID,
-        'redirect_uri': OAUTH_REDIRECT_URI,
+        'redirect_uri': redirect_uri,
         'response_type': 'code',
         'scope': ' '.join(SCOPES),
         'access_type': 'offline',
