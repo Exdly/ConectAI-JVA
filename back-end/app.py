@@ -92,18 +92,14 @@ def auth_status():
 @app.route('/api/auth/url', methods=['GET'])
 def auth_url():
     """Obtiene la URL para autorizar la aplicación con Google."""
-    # Generar redirect_uri dinámicamente basado en el host de la solicitud
-    host = request.headers.get('Host', 'localhost:5000')
-    scheme = 'https' if 'vercel' in host or request.is_secure else 'http'
-    dynamic_redirect_uri = f"{scheme}://{host}/oauth2callback"
+    # Usar siempre la URL de producción fija desde config
+    from config import OAUTH_REDIRECT_URI
+    print(f"[Auth] Usando redirect_uri: {OAUTH_REDIRECT_URI}")
     
-    print(f"[Auth] Generando URL con redirect_uri: {dynamic_redirect_uri}")
-    
-    url = get_authorization_url(dynamic_redirect_uri)
+    url = get_authorization_url()
     return jsonify({
         "success": True,
-        "auth_url": url,
-        "redirect_uri": dynamic_redirect_uri  # Para debug
+        "auth_url": url
     })
 
 
