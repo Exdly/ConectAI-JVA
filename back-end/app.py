@@ -11,19 +11,13 @@ import html
 import re
 import os
 
-# Detectar si estamos en Vercel
-IS_VERCEL = os.environ.get('VERCEL', False) or os.environ.get('VERCEL_ENV', False)
+# Obtener el directorio base del archivo app.py
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Configurar rutas según el entorno
-if IS_VERCEL:
-    # En Vercel, las rutas son relativas a /var/task/
-    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    TEMPLATE_FOLDER = BASE_DIR
-    STATIC_FOLDER = BASE_DIR
-else:
-    # Localmente, usar rutas relativas
-    TEMPLATE_FOLDER = '../'
-    STATIC_FOLDER = '../'
+# Configurar rutas para templates y static dentro de back-end/
+TEMPLATE_FOLDER = os.path.join(BASE_DIR, 'templates')
+STATIC_FOLDER = os.path.join(BASE_DIR, 'static')
+
 
 # Constantes de validación
 MAX_MESSAGE_LENGTH = 2000  # Máximo de caracteres por mensaje
@@ -60,7 +54,7 @@ from google_sheets import get_sheets_manager
 from ai_manager import get_ai_manager
 from web_scraper import get_web_scraper
 
-app = Flask(__name__, static_folder=STATIC_FOLDER, template_folder=TEMPLATE_FOLDER, static_url_path='')
+app = Flask(__name__, static_folder=STATIC_FOLDER, template_folder=TEMPLATE_FOLDER, static_url_path='/static')
 
 CORS(app, resources={
     r"/api/*": {

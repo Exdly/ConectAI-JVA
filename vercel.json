@@ -16,20 +16,12 @@
       "dest": "back-end/app.py"
     },
     {
-      "src": "/",
+      "src": "/static/(.*)",
       "dest": "back-end/app.py"
     },
     {
-      "src": "/(.*\\.css)",
-      "dest": "/$1"
-    },
-    {
-      "src": "/(.*\\.js)",
-      "dest": "/$1"
-    },
-    {
-      "src": "/(.*\\.ico)",
-      "dest": "/$1"
+      "src": "/",
+      "dest": "back-end/app.py"
     }
   ]
 }
