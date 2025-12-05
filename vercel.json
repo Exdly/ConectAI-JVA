@@ -20,7 +20,7 @@
       "dest": "back-end/app.py"
     },
     {
-      "src": "/",
+      "src": "/(.*)",
       "dest": "back-end/app.py"
     }
   ]

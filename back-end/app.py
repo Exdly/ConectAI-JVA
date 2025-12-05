@@ -4,7 +4,7 @@ Servidor Principal - IESTP Juan Velasco Alvarado
 Backend Flask para el chatbot de trámites académicos.
 """
 
-from flask import Flask, request, jsonify, redirect, render_template, send_from_directory
+from flask import Flask, request, jsonify, redirect, render_template
 from flask_cors import CORS
 import traceback
 import html
@@ -15,39 +15,19 @@ import sys
 # Obtener el directorio base del archivo app.py
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Agregar el directorio base al path de Python para que encuentre los módulos
+# Agregar el directorio base al path de Python para imports
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
-# Configurar rutas para templates y static dentro de back-end/
-TEMPLATE_FOLDER = os.path.join(BASE_DIR, 'templates')
-STATIC_FOLDER = os.path.join(BASE_DIR, 'static')
-
-
-
-
 # Constantes de validación
-MAX_MESSAGE_LENGTH = 2000  # Máximo de caracteres por mensaje
+MAX_MESSAGE_LENGTH = 2000
 
 def sanitize_input(text):
-    """
-    Sanitiza el input del usuario para prevenir inyección de código.
-    
-    Args:
-        text: Texto a sanitizar
-        
-    Returns:
-        Texto sanitizado
-    """
+    """Sanitiza el input del usuario para prevenir inyección de código."""
     if not isinstance(text, str):
         return ""
-    
-    # Escapar caracteres HTML para prevenir XSS
     sanitized = html.escape(text)
-    
-    # Remover caracteres de control (excepto saltos de línea y tabs)
     sanitized = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', sanitized)
-    
     return sanitized.strip()
 
 from config import SERVER_PORT, DEBUG_MODE, ALLOWED_ORIGINS
@@ -61,7 +41,13 @@ from google_sheets import get_sheets_manager
 from ai_manager import get_ai_manager
 from web_scraper import get_web_scraper
 
-app = Flask(__name__, static_folder=STATIC_FOLDER, template_folder=TEMPLATE_FOLDER, static_url_path='/static')
+# Configurar Flask con templates y static folders
+app = Flask(
+    __name__,
+    template_folder=os.path.join(BASE_DIR, 'templates'),
+    static_folder=os.path.join(BASE_DIR, 'static'),
+    static_url_path='/static'
+)
 
 CORS(app, resources={
     r"/api/*": {
@@ -77,7 +63,9 @@ CORS(app, resources={
 
 @app.route('/')
 def index():
+    """Página principal del chatbot."""
     return render_template('index.html')
+
 
 @app.route('/api/auth/status', methods=['GET'])
 def auth_status():
@@ -92,10 +80,6 @@ def auth_status():
 @app.route('/api/auth/url', methods=['GET'])
 def auth_url():
     """Obtiene la URL para autorizar la aplicación con Google."""
-    # Usar siempre la URL de producción fija desde config
-    from config import OAUTH_REDIRECT_URI
-    print(f"[Auth] Usando redirect_uri: {OAUTH_REDIRECT_URI}")
-    
     url = get_authorization_url()
     return jsonify({
         "success": True,
@@ -144,7 +128,7 @@ def oauth_callback():
         <html>
         <head><title>Autorización Exitosa</title></head>
         <body style="font-family: Arial; text-align: center; padding: 50px;">
-            <h1 style="color: #4caf50;">Autorización Exitosa!</h1>
+            <h1 style="color: #4caf50;">¡Autorización Exitosa!</h1>
             <p>La aplicación ha sido autorizada correctamente.</p>
             <p>Ahora puedes cerrar esta ventana y usar el chatbot.</p>
             <script>
@@ -185,10 +169,7 @@ def health_check():
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
-    """
-    Endpoint principal para procesar mensajes del chatbot.
-    Ahora incluye información del sitio web además de los PDFs.
-    """
+    """Endpoint principal para procesar mensajes del chatbot."""
     try:
         if not is_authenticated():
             return jsonify({
@@ -205,7 +186,6 @@ def chat():
                 "error": "No se proporcionó un mensaje"
             }), 400
         
-        # Sanitizar y validar el mensaje del usuario
         raw_message = data['message']
         
         if not isinstance(raw_message, str):
@@ -228,20 +208,17 @@ def chat():
                 "error": f"El mensaje excede el límite de {MAX_MESSAGE_LENGTH} caracteres"
             }), 400
         
-        # Validar y sanitizar historial de conversación
         conversation_history = data.get('history', [])
         if not isinstance(conversation_history, list):
             conversation_history = []
         
         print(f"\n[API] Nueva consulta: {user_message[:100]}...")
         
-        # Obtener instancias de los módulos
         drive_manager = get_drive_manager()
         sheets_manager = get_sheets_manager()
         ai_manager = get_ai_manager()
         web_scraper = get_web_scraper()
         
-        # Clasificar consulta
         query_type = ai_manager.classify_query(user_message)
         print(f"[API] Tipo de consulta: {query_type}")
         
@@ -251,7 +228,6 @@ def chat():
         
         web_context = web_scraper.get_all_website_content()
         
-        # Generar respuesta con IA (fallback automático OpenRouter → Gemini)
         response = ai_manager.generate_response(
             user_message=user_message,
             pdf_context=pdf_context,
@@ -262,7 +238,6 @@ def chat():
         row_number = 0
         
         if response is None:
-            # Ambos fallaron - NO guardar en Sheets
             response = (
                 "Lo siento, estoy teniendo dificultades técnicas para procesar tu consulta en este momento. "
                 "Por favor, intenta nuevamente en unos segundos."
@@ -270,19 +245,15 @@ def chat():
             status = "error_ia"
             print("[API] Error de IA - NO se guardará en Google Sheets")
             
-            # Si es una actualización, devolver el row_number que vino en la petición
             row_number_input = data.get('row_number')
             if row_number_input and int(row_number_input) > 0:
                 row_number = int(row_number_input)
         else:
-            # Respuesta exitosa - GUARDAR en Sheets
             status = "completado"
             
-            # Registrar en Google Sheets y obtener ID de fila
             row_number_input = data.get('row_number')
             
             if row_number_input and int(row_number_input) > 0:
-                # Actualizar fila existente
                 sheets_manager.update_consultation(
                     row_number=int(row_number_input),
                     user_query=user_message,
@@ -293,7 +264,6 @@ def chat():
                 row_number = int(row_number_input)
                 print(f"[API] Fila {row_number} actualizada en Google Sheets")
             else:
-                # Crear nueva fila
                 row_number = sheets_manager.log_consultation(
                     user_query=user_message,
                     bot_response=response,
@@ -306,7 +276,7 @@ def chat():
             "success": True,
             "response": response,
             "query_type": query_type,
-            "row_number": row_number  # Devolver el número de fila al frontend
+            "row_number": row_number
         })
         
     except Exception as e:
@@ -404,10 +374,7 @@ def get_statistics():
 
 @app.route('/api/feedback', methods=['POST'])
 def submit_feedback():
-    """
-    Endpoint para registrar el feedback del usuario sobre una respuesta.
-    Guarda likes, dislikes y comentarios en Google Sheets.
-    """
+    """Endpoint para registrar el feedback del usuario sobre una respuesta."""
     try:
         if not is_authenticated():
             return jsonify({
@@ -418,11 +385,11 @@ def submit_feedback():
         data = request.json
     
         message_id = data.get('message_id', '')
-        feedback_type = data.get('feedback_type', '')  # 'like' o 'dislike'
+        feedback_type = data.get('feedback_type', '')
         comment = data.get('comment', '')
         bot_response = data.get('bot_response', '')
         user_query = data.get('user_query', '')
-        row_number = data.get('row_number', 0)  # Nuevo campo
+        row_number = data.get('row_number', 0)
         
         if feedback_type not in ['like', 'dislike', 'none']:
             return jsonify({
@@ -432,16 +399,14 @@ def submit_feedback():
         
         print(f"\n[API] Feedback recibido: {feedback_type}")
         
-        # Si es 'none', limpiamos el feedback (para toggle)
         if feedback_type == 'none':
-            comment = "" # Limpiar comentario también
+            comment = ""
         if comment:
             print(f"[API] Comentario: {comment[:100]}...")
         
         sheets_manager = get_sheets_manager()
         success = False
         
-        # Si tenemos el número de fila, actualizamos
         if row_number and int(row_number) > 0:
             success = sheets_manager.update_feedback(
                 row_number=int(row_number),
@@ -449,7 +414,6 @@ def submit_feedback():
                 comment=comment
             )
         else:
-            # Fallback al comportamiento anterior (nueva fila) si no hay row_number
             success = sheets_manager.log_feedback(
                 user_query=user_query,
                 bot_response=bot_response,
@@ -501,7 +465,6 @@ if __name__ == '__main__':
             print("[Inicializando] Configurando Web Scraper...")
             get_web_scraper()
             
-            # Precargar documentos en segundo plano
             print("[Inicializando] Precargando documentos PDF...")
             drive_mgr.get_all_documents_text()
             

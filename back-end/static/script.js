@@ -25,13 +25,20 @@ document.addEventListener("DOMContentLoaded", () => {
     abortCtrl: null,
     lastUserMsg: "",
   }
+  
+  // Detectar si estamos en producción (Vercel) o desarrollo local
+  const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+  
   const CFG = {
-    BACKEND: window.location.origin,
+    // En producción usar el mismo origen, en local usar localhost:5000
+    BACKEND: isProduction ? window.location.origin : "http://127.0.0.1:5000",
     MIN_W: 300,
     MIN_H: 400,
     MAX_W: 800,
     MAX_H: 700,
   }
+  
+  console.log("[Chatbot] Backend URL:", CFG.BACKEND);
 
   // --- UI ELEMENTS ---
   const els = {
@@ -46,21 +53,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // --- INTERACTION (Drag & Resize) ---
   const interact = {
-    mode: null, // 'drag' | 'resize'
+    mode: null,
     start: { x: 0, y: 0, w: 0, h: 0, l: 0, t: 0 },
     resizer: null,
     
     init() {
-      // Create resizers
       ["top-left", "top-right", "bottom-left", "bottom-right", "left", "right", "top", "bottom"].forEach(pos => {
         els.container.appendChild(h("div", { className: `chatbot-resizer resizer-${pos}`, dataset: { pos } }))
       })
       
-      // Listeners
       els.container.addEventListener("mousedown", this.startAction.bind(this))
       document.addEventListener("mousemove", this.move.bind(this))
       document.addEventListener("mouseup", this.end.bind(this))
-      // Touch support omitted for brevity/optimization as per request, can add if needed
     },
 
     startAction(e) {
@@ -133,17 +137,14 @@ document.addEventListener("DOMContentLoaded", () => {
           state.history.push({ id, role: "user", content: msg })
       }
     } else {
-      // Update existing
       if (rowNum) msgDiv.dataset.rowNumber = rowNum
       const histItem = state.history.find(i => i.id === id)
       if (histItem) histItem.content = msg
     }
 
-    // Content & Actions
-    msgDiv.innerHTML = "" // Clear to rebuild
+    msgDiv.innerHTML = ""
     const bubble = h("div", { className: "message-bubble", innerHTML: contentHtml })
     
-    // Copy Btn (Top Right)
     const copyBtn = h("button", {
       className: "copy-message-btn",
       title: "Copiar",
@@ -153,7 +154,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     msgDiv.append(bubble, copyBtn)
 
-    // Footer Actions
     if (isUser) {
       msgDiv.append(h("div", { className: "message-footer", style: { display: "flex", justifyContent: "flex-end", marginTop: "5px" } },
         h("button", {
@@ -164,7 +164,6 @@ document.addEventListener("DOMContentLoaded", () => {
         })
       ))
     } else {
-      // Bot Actions (Regenerate, Like, Dislike)
       const actions = h("div", { className: "message-actions" },
         h("button", { className: "action-btn regenerate-btn", title: "Regenerar", innerHTML: '<i class="fas fa-sync-alt"></i>', onclick: () => processMessage(state.lastUserMsg) }),
         h("button", { className: "action-btn like-btn", title: "Útil", innerHTML: '<i class="far fa-thumbs-up"></i>', onclick: (e) => handleFeedback(id, true, e.currentTarget) }),
@@ -173,7 +172,6 @@ document.addEventListener("DOMContentLoaded", () => {
       msgDiv.append(actions)
     }
 
-    // Timestamp
     msgDiv.append(h("div", { className: "timestamp", textContent: new Date().toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }) }))
     
     els.msgs.scrollTop = els.msgs.scrollHeight
@@ -227,18 +225,15 @@ document.addEventListener("DOMContentLoaded", () => {
     els.input.focus()
     Object.assign(els.input.dataset, { editId: id, editRow: rowNum })
     
-    // Remove from UI and History to prevent duplication
     const msgDiv = els.msgs.querySelector(`.message[data-id="${id}"]`)
     if (msgDiv) {
         const next = msgDiv.nextElementSibling
         if (next && next.classList.contains("bot")) {
-            // Remove bot response from history
             const botId = next.dataset.id
             state.history = state.history.filter(h => h.id !== botId)
             next.remove()
         }
         msgDiv.remove()
-        // Remove user message from history
         state.history = state.history.filter(h => h.id !== id)
     }
   }
@@ -257,11 +252,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const editId = els.input.dataset.editId
     const rowNum = parseInt(els.input.dataset.editRow || 0)
     
-    // Clear edit state
     delete els.input.dataset.editId
     delete els.input.dataset.editRow
 
-    // Render user message and capture ID
     const currentMsgId = isEdit ? renderMessage(msg, true, editId, rowNum) : renderMessage(msg, true)
 
     showTyping()
@@ -285,7 +278,6 @@ document.addEventListener("DOMContentLoaded", () => {
         else renderMessage("Error de autenticación.", false)
       } else if (data.success) {
         renderMessage(data.response, false, undefined, data.row_number)
-        // Update user message with new row number if assigned
         const userMsg = els.msgs.querySelector(`.message[data-id="${currentMsgId}"]`)
         if(userMsg && data.row_number) userMsg.dataset.rowNumber = data.row_number
       } else {
@@ -293,7 +285,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     } catch (e) {
       if (e.name === "AbortError") {
-        // Restore input and remove message if aborted
         els.input.value = msg
         els.input.focus()
         const msgDiv = els.msgs.querySelector(`.message[data-id="${currentMsgId}"]`)
@@ -314,13 +305,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const type = isLike ? "like" : "dislike"
     const isActive = btn.classList.contains("active")
     
-    // Toggle visual state
     if (isActive) {
         btn.classList.remove("active")
-        // Send 'none' to remove feedback
         await sendFeedback(id, "none", "", btn)
     } else {
-        // Deactivate sibling
         const sibling = isLike ? btn.nextElementSibling : btn.previousElementSibling
         if (sibling) sibling.classList.remove("active")
         
@@ -354,7 +342,6 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (e) {
         console.error("[Chatbot] Error enviando feedback:", e)
         showNotif("Error", "No se pudo registrar tu opinión", "error")
-        // Revert visual state on error
         btn.classList.remove("active")
     }
   }
@@ -369,12 +356,11 @@ document.addEventListener("DOMContentLoaded", () => {
   // --- INITIALIZATION ---
   interact.init()
 
-  // Event Listeners
   $("minimizeChatbot").onclick = (e) => {
     e.stopPropagation()
     state.isMinimized = !state.isMinimized
     els.container.classList.toggle("minimized", state.isMinimized)
-    if (state.isMinimized) els.container.style.height = "" // Reset height for mini
+    if (state.isMinimized) els.container.style.height = ""
   }
   
   $("closeChatbot").onclick = (e) => {
