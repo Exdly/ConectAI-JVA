@@ -32,19 +32,11 @@ GOOGLE_SHEET_ID = "1kU5OGEHdM8eilXVnCWaj1cT5Ob3qL8Rk90Dc2ApBTUw"
 GOOGLE_CLIENT_ID = "100818622156-fcjmhg1afp3nkfrdjtmrhi2ebvo08lkt.apps.googleusercontent.com"
 GOOGLE_CLIENT_SECRET = "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"
 
-# URI de redirección para el flujo OAuth
-# Detectar si estamos en Vercel para usar la URL de producción
-if os.environ.get('VERCEL'):
-    OAUTH_REDIRECT_URI = "https://conect-ai-jva.vercel.app/oauth2callback"
-else:
-    OAUTH_REDIRECT_URI = "http://localhost:5000/oauth2callback"
-
 # =============================================================================
 # CONFIGURACIÓN DEL SERVIDOR
 # =============================================================================
 
 SERVER_PORT = 5000
-DEBUG_MODE = not os.environ.get('VERCEL')  # False en Vercel, True en local
 
 # Orígenes permitidos para CORS
 ALLOWED_ORIGINS = [
@@ -88,13 +80,24 @@ GEMINI_COOLDOWN = 60
 # CONFIGURACIÓN DE ARCHIVOS Y CACHE
 # =============================================================================
 
-# En Vercel, el sistema de archivos es de solo lectura, usar /tmp
-if os.environ.get('VERCEL'):
+# Detectar si estamos en Vercel
+IS_VERCEL = os.environ.get('VERCEL')
+
+if IS_VERCEL:
+    # En Vercel, el sistema de archivos es de solo lectura, excepto /tmp
     TOKEN_FILE = "/tmp/token.json"
     CACHE_FOLDER = "/tmp/cache_pdfs"
+    # URL de redirección en producción
+    OAUTH_REDIRECT_URI = "https://conect-ai-jva.vercel.app/oauth2callback"
+    DEBUG_MODE = False
 else:
-    TOKEN_FILE = os.path.join(os.path.dirname(__file__), "token.json")
-    CACHE_FOLDER = os.path.join(os.path.dirname(__file__), "cache_pdfs")
+    # En local, usar rutas relativas al archivo actual
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    TOKEN_FILE = os.path.join(BASE_DIR, "token.json")
+    CACHE_FOLDER = os.path.join(BASE_DIR, "cache_pdfs")
+    # URL de redirección local
+    OAUTH_REDIRECT_URI = "http://localhost:5000/oauth2callback"
+    DEBUG_MODE = True
 
 CACHE_REFRESH_INTERVAL = 1800
 

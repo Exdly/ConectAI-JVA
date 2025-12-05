@@ -30,15 +30,16 @@ document.addEventListener("DOMContentLoaded", () => {
     const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
     
     const CFG = {
-      // En producción usar el mismo origen
-      BACKEND: isProduction ? window.location.origin : "http://127.0.0.1:5000",
+      // Usar ruta relativa para que funcione tanto en Local como en Vercel
+      BACKEND: "", 
       MIN_W: 300,
       MIN_H: 400,
       MAX_W: 800,
       MAX_H: 700,
     }
     
-    console.log("[Chatbot] Backend URL:", CFG.BACKEND);
+    console.log("[Chatbot] Backend URL (Relative):", window.location.origin);
+
   
     // --- UI ELEMENTS ---
     const els = {
