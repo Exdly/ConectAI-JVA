@@ -99,6 +99,9 @@ ALLOWED_ORIGINS = [
     "https://proyectojva.free.nf",
     "https://iestpjva.edu.pe",
     "http://iestpjva.edu.pe",
+    # Dominios de Vercel:
+    "https://conect-ai-jva.vercel.app",
+    "https://*.vercel.app",
 ]
 
 # =============================================================================
