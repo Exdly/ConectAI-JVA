@@ -283,3 +283,4 @@ PDF_FILES_MAPPING = {
     "mpp": "[10] MPP Manual",
     "mpa": "[11] MPA Manual",
 }
+# Force redeploy
