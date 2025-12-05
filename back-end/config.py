@@ -77,8 +77,8 @@ GOOGLE_CLIENT_SECRET = "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"
 # En Vercel usamos la URL de producción fija, en local usamos localhost
 import os
 if os.environ.get('VERCEL'):
-    # En Vercel, usar la URL exacta del deployment
-    OAUTH_REDIRECT_URI = "https://conect-ai-3c3mdrysu-exdlys-projects.vercel.app/oauth2callback"
+    # En Vercel, usar la URL de producción
+    OAUTH_REDIRECT_URI = "https://conect-ai-jva.vercel.app/oauth2callback"
 else:
     # Desarrollo local
     OAUTH_REDIRECT_URI = "http://localhost:5000/oauth2callback"
@@ -146,11 +146,15 @@ GEMINI_COOLDOWN = 60      # Segundos de espera tras error (reducido)
 # CONFIGURACIÓN DE ARCHIVOS Y CACHE
 # =============================================================================
 
-# Ruta al archivo de token (se genera automáticamente después de autorizar)
-TOKEN_FILE = os.path.join(os.path.dirname(__file__), "token.json")
-
-# Carpeta para cache de PDFs descargados
-CACHE_FOLDER = os.path.join(os.path.dirname(__file__), "cache_pdfs")
+# En Vercel, el sistema de archivos es de solo lectura, usar /tmp
+if os.environ.get('VERCEL'):
+    # En Vercel, usar el directorio temporal que sí es escribible
+    TOKEN_FILE = "/tmp/token.json"
+    CACHE_FOLDER = "/tmp/cache_pdfs"
+else:
+    # Desarrollo local
+    TOKEN_FILE = os.path.join(os.path.dirname(__file__), "token.json")
+    CACHE_FOLDER = os.path.join(os.path.dirname(__file__), "cache_pdfs")
 
 CACHE_REFRESH_INTERVAL = 1800
 
