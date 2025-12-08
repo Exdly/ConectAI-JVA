@@ -403,8 +403,46 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Check Auth
-  fetch(`${CFG.BACKEND}/api/auth/status`).then(r => r.json()).then(d => state.auth = d.authenticated)
+  // --- OAUTH MESSAGE LISTENER ---
+  // Listen for OAuth success from popup window
+  window.addEventListener("message", (event) => {
+    if (event.data === "oauth_success") {
+      console.log("[Chatbot] OAuth autorizado exitosamente, recargando página...")
+      showNotif("Conectado", "Google autorizado correctamente", "success")
+      // Remove auth messages from chat
+      els.msgs.querySelectorAll(".message.bot").forEach(msg => {
+        if (msg.textContent.includes("Autorizar Google") || msg.textContent.includes("autorización")) {
+          msg.remove()
+        }
+      })
+      // Reload page after a short delay to ensure tokens are saved
+      setTimeout(() => window.location.reload(), 1500)
+    }
+  })
+
+  // --- CHECK AUTH AT STARTUP ---
+  const checkAuthAndShowMessage = async () => {
+    try {
+      const res = await fetch(`${CFG.BACKEND}/api/auth/status`)
+      const data = await res.json()
+      state.auth = data.authenticated
+      
+      if (!state.auth) {
+        // Show auth message at startup
+        const authRes = await fetch(`${CFG.BACKEND}/api/auth/url`).then(r => r.json())
+        if (authRes.auth_url) {
+          addLinkMessage("Para usar el asistente, primero conecta tu cuenta:", "Conectar con Google", authRes.auth_url)
+        }
+      } else {
+        console.log("[Chatbot] Ya autenticado con Google")
+      }
+    } catch (e) {
+      console.error("[Chatbot] Error verificando autenticación:", e)
+    }
+  }
+  
+  // Run auth check at startup
+  checkAuthAndShowMessage()
 
   // Suggestions
   document.querySelectorAll(".suggestion-chip").forEach(chip => {
