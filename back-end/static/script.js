@@ -414,15 +414,24 @@ document.addEventListener("DOMContentLoaded", () => {
       console.log("[Chatbot] OAuth autorizado exitosamente, recargando página...")
       showNotif("Conectado", "Google autorizado correctamente", "success")
       // Remove auth messages from chat
-      els.msgs.querySelectorAll(".message.bot").forEach(msg => {
-        if (msg.textContent.includes("Autorizar Google") || msg.textContent.includes("autorización")) {
-          msg.remove()
-        }
-      })
+      removeAuthMessages()
       // Reload page after a short delay to ensure tokens are saved
       setTimeout(() => window.location.reload(), 1500)
     }
   })
+
+  // Helper function to remove auth-related messages
+  const removeAuthMessages = () => {
+    els.msgs.querySelectorAll(".message.bot").forEach(msg => {
+      const text = msg.textContent.toLowerCase()
+      if (text.includes("conectar con google") || 
+          text.includes("autorizar google") || 
+          text.includes("conecta tu cuenta") ||
+          text.includes("autorización")) {
+        msg.remove()
+      }
+    })
+  }
 
   // --- CHECK AUTH AT STARTUP ---
   const checkAuthAndShowMessage = async () => {
@@ -432,13 +441,20 @@ document.addEventListener("DOMContentLoaded", () => {
       state.auth = data.authenticated
       
       if (!state.auth) {
-        // Show auth message at startup
-        const authRes = await fetch(`${CFG.BACKEND}/api/auth/url`).then(r => r.json())
-        if (authRes.auth_url) {
-          addLinkMessage("Para usar el asistente, primero conecta tu cuenta:", "Conectar con Google", authRes.auth_url)
+        // Show auth message at startup only if not already shown
+        const existingAuthMsg = Array.from(els.msgs.querySelectorAll(".message.bot")).some(
+          msg => msg.textContent.toLowerCase().includes("conectar con google")
+        )
+        if (!existingAuthMsg) {
+          const authRes = await fetch(`${CFG.BACKEND}/api/auth/url`).then(r => r.json())
+          if (authRes.auth_url) {
+            addLinkMessage("Para usar el asistente, primero conecta tu cuenta:", "Conectar con Google", authRes.auth_url)
+          }
         }
       } else {
         console.log("[Chatbot] Ya autenticado con Google")
+        // Remove any lingering auth messages if user is already authenticated
+        removeAuthMessages()
       }
     } catch (e) {
       console.error("[Chatbot] Error verificando autenticación:", e)
