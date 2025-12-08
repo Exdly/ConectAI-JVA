@@ -486,7 +486,11 @@ if __name__ == '__main__':
             get_ai_manager()
             
             print("[Inicializando] Configurando Web Scraper...")
-            get_web_scraper()
+            print("[Inicializando] Configurando Web Scraper...")
+            scraper = get_web_scraper()
+            # Force scrape/update cache on startup
+            print("[Inicializando] Verificando/Actualizando contenido web...")
+            scraper.get_all_website_content()
             
             # Precargar documentos en segundo plano
             print("[Inicializando] Precargando documentos PDF...")
