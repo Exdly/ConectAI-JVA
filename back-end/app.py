@@ -10,6 +10,12 @@ import traceback
 import html
 import re
 import os
+import sys
+
+# Agregar el directorio back-end al path de Python para que Vercel pueda encontrar los módulos
+BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+if BACKEND_DIR not in sys.path:
+    sys.path.insert(0, BACKEND_DIR)
 
 # Constantes de validación
 MAX_MESSAGE_LENGTH = 2000  # Máximo de caracteres por mensaje
