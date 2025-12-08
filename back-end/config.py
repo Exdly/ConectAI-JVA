@@ -107,8 +107,12 @@ OPENROUTER_MODELS = [
 # - gemini-2.5-flash: 5 RPM, 250K TPM, 20 RPD
 # - gemini-2.0-flash/lite: 0/limitado (NO USAR)
 GEMINI_MODELS = [
-    "gemini-2.5-flash-lite",  # PRIMERO: Mejor cuota (10 RPM) + económico
-    "gemini-2.5-flash",       # SEGUNDO: Buena cuota (5 RPM) + razonamiento
+    "gemini-2.5-flash-lite",  # PRIMERO: Mejor cuota (10 RPM)
+    "gemini-2.5-flash",       # SEGUNDO: Buena cuota (5 RPM)
+    "gemini-2.0-flash-lite",  # TERCERO: Muy rápido y económico
+    "gemini-2.0-flash",       # CUARTO: Estable
+    "gemini-1.5-flash",       # FALLBACK: Alto límite diario (1500 RPD)
+    "gemini-1.5-pro",         # Mayor razonamiento (lento)
 ]
 
 # Configuración General IA

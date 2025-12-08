@@ -46,7 +46,9 @@ class AIManager:
         self.openrouter_key = OPENROUTER_API_KEY
         self.openrouter_models = OPENROUTER_MODELS
         self.gemini_models = GEMINI_MODELS
-        self.gemini_cooldown_until = 0  # Timestamp hasta cuando esperar
+        self.gemini_models = GEMINI_MODELS
+        # Cooldown independiente por modelo
+        self.gemini_cooldowns: Dict[str, float] = {m: 0 for m in self.gemini_models}
         
         # Diagnóstico de API Keys
         print("\n" + "="*50)
@@ -69,13 +71,12 @@ class AIManager:
                 genai.configure(api_key=GEMINI_API_KEY)
                 print(f"[AIManager] Gemini configurado correctamente")
                 
-                # Test rápido para verificar que la API key funciona
-                # Usamos gemini-2.5-flash-lite porque tiene la mejor cuota (10 RPM)
+                # Test con el primer modelo disponible
                 try:
-                    test_model = genai.GenerativeModel("gemini-2.5-flash-lite")
+                    test_model_name = self.gemini_models[0]
+                    test_model = genai.GenerativeModel(test_model_name)
                     test_response = test_model.generate_content("Di solo 'OK' sin nada mas")
-                    print(f"[AIManager] TEST Gemini: EXITOSO - API funcionando")
-                    self.gemini_cooldown_until = 0  # Listo para usar
+                    print(f"[AIManager] TEST Gemini ({test_model_name}): EXITOSO")
                 except Exception as test_error:
                     print(f"[AIManager] TEST Gemini FALLÓ: {str(test_error)[:200]}")
             except Exception as e:
@@ -83,18 +84,16 @@ class AIManager:
         else:
             print("[AIManager] ADVERTENCIA: GEMINI_API_KEY no esta definida.")
     
-    def _can_call_gemini(self) -> bool:
-        """Verifica si podemos llamar a Gemini (respeta cooldown)."""
-        if not GEMINI_API_KEY:
-            print("[AIManager] ADVERTENCIA: No se puede usar Gemini - GEMINI_API_KEY no configurada")
-            return False
+    def _can_call_gemini(self, model_name: str) -> bool:
+        """Verifica si podemos llamar a un modelo específico de Gemini."""
+        if not GEMINI_API_KEY: return False
         
         now = time.time()
-        if now < self.gemini_cooldown_until:
-            print(f"[AIManager] Gemini en cooldown ({int(self.gemini_cooldown_until - now)}s)")
-            return False
+        cooldown = self.gemini_cooldowns.get(model_name, 0)
         
-        print("[AIManager] Gemini disponible para usar")
+        if now < cooldown:
+            print(f"[AIManager] {model_name} en cooldown por {int(cooldown - now)}s")
+            return False
         return True
     
     def _handle_gemini_error(self, error):
@@ -104,27 +103,24 @@ class AIManager:
         
         if "429" in error_str or "Resource exhausted" in error_str:
             # Intentar parsear el tiempo de espera sugerido por Gemini
-            # Ejemplo: "Please retry in 15.719514733s"
             retry_match = re.search(r'retry in (\d+\.?\d*)s', error_str)
+            backoff = 20 # Default
             
             if retry_match:
-                # Usar el tiempo que Gemini nos dice + pequeño buffer
                 suggested_wait = float(retry_match.group(1))
                 backoff = min(suggested_wait + 5, 60)  # Máximo 60s
                 print(f"[AIManager] Gemini sugiere esperar {suggested_wait:.1f}s, usamos {backoff:.1f}s")
             else:
-                # Fallback: cooldown corto fijo (no exponencial agresivo)
-                backoff = 20  # Solo 20 segundos por defecto
                 print(f"[AIManager] Gemini 429 sin tiempo sugerido, usando {backoff}s")
             
-            self.gemini_cooldown_until = time.time() + backoff
-            print(f"[AIManager] Gemini Rate Limit (429): Cooldown {int(backoff)}s")
+            return backoff
             
         elif "404" in error_str or "not found" in error_str.lower():
-            print(f"[AIManager] Gemini modelo no encontrado - NO aplicar cooldown")
-            # No aplicar cooldown para 404, solo probar siguiente modelo
-        else:
-            print(f"[AIManager] Error Gemini desconocido: {error_str}")
+             print(f"[AIManager] Modelo no encontrado (404) - Probando siguiente")
+             return 0
+        
+        print(f"[AIManager] Error Gemini desconocido: {error_str[:100]}")
+        return 5 # Error genérico, espera corta
 
     def _is_useful_response(self, response: str, query_type: str) -> bool:
         """Determina si una respuesta es útil basándose en el tipo de consulta."""
@@ -200,21 +196,59 @@ class AIManager:
         
         # 2. INTENTO CON GEMINI (Contexto LIMITADO por cuota de tokens)
         # -----------------------------------------------------
-        if self._can_call_gemini():
-            # Gemini tiene límite de 250k tokens en tier gratuito
-            # Reducimos a ~600k chars (~150k tokens) + 10k web = ~160k tokens total
-            # Esto deja margen para prompt y respuesta sin acercarse al límite
-            gemini_context_limit = 600000  # ~150k tokens
-            gemini_context = pdf_context[:gemini_context_limit]
-            print(f"[AIManager] Contexto para Gemini: {len(gemini_context)} chars (~{len(gemini_context)//4}k tokens)")
+        if True: # Siempre intentamos Gemini si OpenRouter falla
+            # PREPARACIÓN DE CONTEXTO OPTIMIZADO (Smart Context)
+            # Reducimos de 600k a 40k caracteres buscando lo relevante
+            gemini_context = self._get_relevant_context(user_message, pdf_context, max_chars=40000)
             
-            gm_response = self._run_model_chain("gemini", user_message, gemini_context, web_context, conversation_history, query_type)
+            # 10k contexto web extra si cabe
+            final_web = web_context[:10000]
+            
+            print(f"[AIManager] Contexto optimizado: {len(gemini_context)} chars (PDF) + {len(final_web)} chars (Web)")
+            
+            gm_response = self._run_model_chain("gemini", user_message, gemini_context, final_web, conversation_history, query_type)
             if gm_response:
-                print("[AIManager] [OK] Respuesta encontrada en Gemini")
                 return gm_response
         
-        # Fallback final
         return or_response
+
+    def _get_relevant_context(self, query: str, full_context: str, max_chars: int = 40000) -> str:
+        """Selecciona las partes más relevantes del texto para la consulta (filtro de tokens)."""
+        if len(full_context) < max_chars:
+            return full_context
+            
+        query_words = [w.lower() for w in query.split() if len(w) > 3]
+        if not query_words:
+            return full_context[:max_chars] # Si no hay keywords claras, devolvemos el inicio
+            
+        # Dividir por secciones lógicas (ej. encabezados o párrafos dobles)
+        chunks = full_context.split('\n\n')
+        scored_chunks = []
+        
+        for chunk in chunks:
+            if len(chunk) < 50: continue
+            score = 0
+            chunk_lower = chunk.lower()
+            for word in query_words:
+                score += chunk_lower.count(word)
+            scored_chunks.append((score, chunk))
+            
+        # Ordenar por relevancia
+        scored_chunks.sort(key=lambda x: x[0], reverse=True)
+        
+        # Seleccionar top chunks hasta llenar cupo
+        selected = []
+        current_len = 0
+        for score, chunk in scored_chunks:
+            if current_len + len(chunk) > max_chars:
+                break
+            selected.append(chunk)
+            current_len += len(chunk)
+            
+        # IMPORTANTE: Reordenar chunks seleccionados para mantener coherencia si es posible
+        # (Aunque aquí perdemos el orden original, para RAG simple suele bastar)
+        print(f"[SmartContext] Seleccionados {len(selected)} bloques relevantes para '{query_words}'")
+        return "\n\n...\n\n".join(selected)
 
     def _run_model_chain(self, provider: str, user_message: str, pdf_context: str, web_context: str, history: list, query_type: str) -> Optional[str]:
         """Ejecuta una cadena de modelos secuencialmente."""
@@ -228,7 +262,15 @@ class AIManager:
             if provider == "openrouter":
                 response = self._call_openrouter(model_name, user_message, pdf_context, web_context, history)
             else:
+                # Verificar cooldown específico del modelo
+                if not self._can_call_gemini(model_name):
+                    continue # Saltar este modelo, probar siguiente INMEDIATAMENTE
+                    
                 response = self._call_gemini(model_name, user_message, pdf_context, web_context, history)
+                
+                # Gestión de errores específicos dentro de _call_gemini devuelve None
+                # Si hubo error 429, el cooldown ya se seteó adentro de _call_gemini (necesitamos pasar self)
+                pass
                 
             if response:
                 if self._is_useful_response(response, query_type):
@@ -307,7 +349,10 @@ Tu ÚNICO objetivo es extraer y presentar DATOS EXACTOS (fechas, costos, requisi
             if hasattr(resp, 'parts'): return "".join([p.text for p in resp.parts])
             return None
         except Exception as e:
-            self._handle_gemini_error(e)
+            backoff = self._handle_gemini_error(e)
+            if backoff > 0:
+                self.gemini_cooldowns[model_name] = time.time() + backoff
+                print(f"[AIManager] {model_name} pausado por {backoff}s. Probando siguiente...")
             return None
 
 # Singleton
