@@ -85,7 +85,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const btns = [
         { cls: "like-btn", icon: "thumbs-up", title: "Útil", click: (e) => handleFeedback(id, true, e.currentTarget) },
         { cls: "dislike-btn", icon: "thumbs-down", title: "No útil", click: (e) => handleFeedback(id, false, e.currentTarget) },
-        { cls: "regenerate-btn", icon: "redo", title: "Regenerar", click: () => processMessage(state.lastUserMsg) }
+        { cls: "regenerate-btn", icon: "redo", title: "Regenerar", click: () => processMessage(state.lastUserMsg, true) }
       ];
       msgDiv.append(h("div", { className: "message-actions" }, ...btns.map(b => h("button", { className: `action-btn ${b.cls}`, title: b.title, onclick: b.click, innerHTML: `<i class="fas fa-${b.icon}"></i>` }))));
     } else if (isUser) {
@@ -103,12 +103,14 @@ document.addEventListener("DOMContentLoaded", () => {
     bubble.append(h("div", { style: { marginTop: "10px" } }, h("a", { href: url, target: "_blank", textContent: linkTxt, style: { color: "#1c2682", fontWeight: "bold", textDecoration: "underline" } })));
   };
 
-  const processMessage = async (msg) => {
+  const processMessage = async (msg, isRegen = false) => {
     if (state.isProcessing) return;
     state.isProcessing = true;
     const isEdit = !!els.input.dataset.editId, editId = els.input.dataset.editId, rowNum = parseInt(els.input.dataset.editRow || 0);
     delete els.input.dataset.editId; delete els.input.dataset.editRow;
-    const currentMsgId = isEdit ? renderMessage(msg, true, editId, rowNum) : renderMessage(msg, true);
+    
+    // Si regeneramos, NO mostramos burbuja nueva. Si es edit, o msg nuevo, si.
+    const currentMsgId = (isRegen && !isEdit) ? null : (isEdit ? renderMessage(msg, true, editId, rowNum) : renderMessage(msg, true));
     
     showTyping(); updateSendBtn(true);
     try {

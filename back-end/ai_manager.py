@@ -281,6 +281,12 @@ class AIManager:
             else:
                 print(f"[AIManager] {model_name} fallo. Probando siguiente...")
                 
+        # Si ninguno fue útil, devolver la última respuesta obtenida (si hubo)
+        # Esto evita "Dificultades técnicas" cuando simplemente no hay info
+        if response:
+            print("[AIManager] Fallback: Devolviendo ultima respuesta no-util")
+            return response
+            
         return None
 
     def _build_prompt(self, user_message: str, pdf_context: str, web_context: str, history: list) -> str:
