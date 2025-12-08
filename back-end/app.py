@@ -75,6 +75,15 @@ CORS(app, resources={
     }
 })
 
+# Handler para loguear TODAS las peticiones entrantes
+@app.before_request
+def log_request():
+    """Loguea cada petición entrante para diagnóstico."""
+    import sys
+    if request.endpoint not in ['static', None]:  # No loguear archivos estáticos
+        print(f"\n[FLASK] >>> Peticion recibida: {request.method} {request.path}", flush=True)
+        sys.stdout.flush()
+
 # =============================================================================
 # ENDPOINTS DE AUTENTICACIÓN
 # =============================================================================
@@ -181,6 +190,12 @@ def chat():
     Endpoint principal para procesar mensajes del chatbot.
     Ahora incluye información del sitio web además de los PDFs.
     """
+    import sys
+    print("\n" + "="*50, flush=True)
+    print("[API/CHAT] >>> SOLICITUD RECIBIDA <<<", flush=True)
+    print("="*50, flush=True)
+    sys.stdout.flush()
+    
     try:
         if not is_authenticated():
             return jsonify({
@@ -228,28 +243,41 @@ def chat():
         print(f"\n[API] Nueva consulta: {user_message[:100]}...")
         
         # Obtener instancias de los módulos
+        print("[API] Obteniendo instancias de modulos...")
         drive_manager = get_drive_manager()
+        print("[API] - drive_manager OK")
         sheets_manager = get_sheets_manager()
+        print("[API] - sheets_manager OK")
         ai_manager = get_ai_manager()
+        print("[API] - ai_manager OK")
         web_scraper = get_web_scraper()
+        print("[API] - web_scraper OK")
         
         # Clasificar consulta
+        print("[API] Clasificando consulta...")
         query_type = ai_manager.classify_query(user_message)
         print(f"[API] Tipo de consulta: {query_type}")
         
+        print("[API] Obteniendo contexto de PDFs...")
         pdf_context = drive_manager.search_in_documents(user_message)
         if not pdf_context:
             print("[API] ADVERTENCIA: No se pudo obtener contexto de PDFs")
+        else:
+            print(f"[API] Contexto PDF obtenido: {len(pdf_context)} caracteres")
         
+        print("[API] Obteniendo contexto web...")
         web_context = web_scraper.get_all_website_content()
+        print(f"[API] Contexto web obtenido: {len(web_context) if web_context else 0} caracteres")
         
         # Generar respuesta con IA (fallback automático OpenRouter → Gemini)
+        print("[API] Llamando a AI Manager para generar respuesta...")
         response = ai_manager.generate_response(
             user_message=user_message,
             pdf_context=pdf_context,
             web_context=web_context,
             conversation_history=conversation_history
         )
+        print(f"[API] Respuesta generada: {'SI' if response else 'NO'} ({len(response) if response else 0} chars)")
         
         row_number = 0
         

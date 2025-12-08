@@ -73,12 +73,12 @@ SERVER_PORT = 5000
 
 # Orígenes permitidos para CORS (añadir el de Vercel)
 ALLOWED_ORIGINS = [
-    "http://localhost:5500",
-    "http://127.0.0.1:5500",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
     "http://localhost:5000",
     "http://127.0.0.1:5000",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5500",
+    "http://127.0.0.1:5500",
     "http://proyectojva.free.nf",
     "https://proyectojva.free.nf",
     "https://iestpjva.edu.pe",
@@ -91,18 +91,24 @@ ALLOWED_ORIGINS = [
 # =============================================================================
 
 # Configuración de Modelos IA
-# OpenRouter (Modelos Gratuitos solicitados - Orden de prioridad)
+# OpenRouter (Modelos Gratuitos disponibles - Dic 2024)
+# Basado en capturas de OpenRouter del usuario
 OPENROUTER_MODELS = [
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "google/gemma-2-9b-it:free", # Actualizado a Gemma 2
-    "mistralai/mistral-7b-instruct:free",
+    "google/gemma-3-27b-it:free",             # Gemma 3 27B - Buen contexto
+    "meta-llama/llama-3.2-3b-instruct:free",  # Llama 3.2 3B - Ligero y rápido
+    "qwen/qwen3-4b:free",                     # Qwen3 4B - Buen modelo pequeño
+    "mistralai/mistral-small-3.1-24b-instruct:free", # Mistral Small 3.1 24B
 ]
 
-# Google Gemini (Modelos solicitados - Orden de prioridad)
+# Google Gemini (Modelos disponibles según tu cuenta - Dic 2024)
+# Usar nombres exactos que aparecen en Google AI Studio
+# Basado en capturas del panel de usuario:
+# - gemini-2.5-flash-lite: 10 RPM, 250K TPM, 20 RPD (MEJOR CUOTA)
+# - gemini-2.5-flash: 5 RPM, 250K TPM, 20 RPD
+# - gemini-2.0-flash/lite: 0/limitado (NO USAR)
 GEMINI_MODELS = [
-    "gemini-2.0-flash",     # Estable y rápido
-    "gemini-1.5-flash",     # Fallback robusto
-    "gemini-1.5-pro",       # Mayor razonamiento
+    "gemini-2.5-flash-lite",  # PRIMERO: Mejor cuota (10 RPM) + económico
+    "gemini-2.5-flash",       # SEGUNDO: Buena cuota (5 RPM) + razonamiento
 ]
 
 # Configuración General IA
@@ -122,7 +128,7 @@ IS_VERCEL = os.environ.get('VERCEL')
 if IS_VERCEL:
     # En Vercel, el sistema de archivos es de solo lectura, excepto /tmp
     TOKEN_FILE = "/tmp/token.json"
-    CACHE_FOLDER = "/tmp/cache_pdfs"
+    CACHE_FOLDER = "/tmp/cache"  # Para cache dinámico (pdf_cache, web_cache)
     # URL de redirección en producción
     OAUTH_REDIRECT_URI = "https://conect-ai-jva.vercel.app/oauth2callback"
     DEBUG_MODE = False
@@ -130,10 +136,14 @@ else:
     # En local, usar rutas relativas al archivo actual
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     TOKEN_FILE = os.path.join(BASE_DIR, "token.json")
-    CACHE_FOLDER = os.path.join(BASE_DIR, "cache_pdfs")
-    # URL de redirección local (User provided hardcoded value logic integrated here via variable)
+    CACHE_FOLDER = os.path.join(BASE_DIR, "cache")  # Renombrado de cache_pdfs
+    # URL de redirección local
     OAUTH_REDIRECT_URI = "http://localhost:5000/oauth2callback"
     DEBUG_MODE = True
+
+# Carpeta de cache estático (siempre relativa al código, NO a /tmp/)
+# Esto permite que Vercel lea el archivo desplegado
+STATIC_CACHE_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache")
 
 CACHE_REFRESH_INTERVAL = 1800
 
