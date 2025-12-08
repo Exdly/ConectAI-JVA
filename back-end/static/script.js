@@ -29,6 +29,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const rect = els.container.getBoundingClientRect();
       this.startData = { x: clientX, y: clientY, w: rect.width, h: rect.height, l: rect.left, t: rect.top };
       this.moved = false; els.container.classList.add("resizing"); els.container.style.transition = "none";
+      // Pin position immediately to avoid jumps when removing transform
+      Object.assign(els.container.style, { left: `${rect.left}px`, top: `${rect.top}px`, right: "auto", bottom: "auto", transform: "none" });
     },
     move(e) {
       if (!this.mode) return;
