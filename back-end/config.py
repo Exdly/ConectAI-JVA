@@ -1,28 +1,61 @@
 """
 Configuración del Backend - IESTP Juan Velasco Alvarado
 ========================================================
+INSTRUCCIONES DE CONFIGURACIÓN:
+
+1. OPENROUTER_API_KEY:
+   - Ve a https://openrouter.ai/
+   - Crea una cuenta o inicia sesión
+   - Ve a "Keys" y genera una nueva API Key
+   - Copia la key y pégala en OPENROUTER_API_KEY
+
+2. GEMINI_API_KEY (GRATIS - 15 req/min, 1500/día):
+   - Ve a https://makersuite.google.com/app/apikey
+   - Click "Create API Key" y selecciona tu proyecto
+   - Copia la key y pégala en GEMINI_API_KEY
+   - ¡Es completamente GRATIS!
+
+3. GOOGLE_DRIVE_FOLDER_ID:
+   - Abre tu carpeta TRAMITES_JVA en Google Drive
+   - Copia el ID de la URL: https://drive.google.com/drive/folders/[ESTE_ES_EL_ID]
+   - Pégalo en GOOGLE_DRIVE_FOLDER_ID
+
+4. GOOGLE_SHEET_ID:
+   - Crea un nuevo Google Sheet para registrar consultas
+   - Copia el ID de la URL: https://docs.google.com/spreadsheets/d/[ESTE_ES_EL_ID]/edit
+   - Pégalo en GOOGLE_SHEET_ID
+
+5. CREDENCIALES DE GOOGLE (Aplicación Web):
+   - Ve a https://console.cloud.google.com/
+   - En "Credenciales" > "ID de cliente OAuth 2.0" (Aplicación Web)
+   - Copia el "ID de cliente" y pégalo en GOOGLE_CLIENT_ID
+   - Copia el "Secreto del cliente" y pégalo en GOOGLE_CLIENT_SECRET
+   - Asegúrate de agregar las URIs de redirección autorizadas:
+     * http://127.0.0.1:5500/
+     * http://localhost:5000/oauth2callback
+     * Tu dominio de producción
 """
 
 import os
 from dotenv import load_dotenv
 
-# Cargar variables de entorno desde archivo .env
+# Cargar variables de entorno desde archivo .env (si existe)
 load_dotenv()
 
 # =============================================================================
 # CONFIGURACIÓN DE APIs - USAR VARIABLES DE ENTORNO
 # =============================================================================
 
-# API Key de OpenRouter (cargada desde .env o variables de entorno de Vercel)
+# API Key de OpenRouter
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 
-# API Key de Google Gemini (cargada desde .env o variables de entorno de Vercel)
+# API Key de Google Gemini
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 # ID de la carpeta de Google Drive donde están los PDFs
 GOOGLE_DRIVE_FOLDER_ID = "1PGUC-Schws7p342zwmZx8LK7Eb153cC8"
 
-# ID del Google Sheet para registro de consultas
+# ID de la hoja de cálculo
 GOOGLE_SHEET_ID = "1kU5OGEHdM8eilXVnCWaj1cT5Ob3qL8Rk90Dc2ApBTUw"
 
 # =============================================================================
@@ -38,7 +71,7 @@ GOOGLE_CLIENT_SECRET = "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"
 
 SERVER_PORT = 5000
 
-# Orígenes permitidos para CORS
+# Orígenes permitidos para CORS (añadir el de Vercel)
 ALLOWED_ORIGINS = [
     "http://localhost:5500",
     "http://127.0.0.1:5500",
@@ -50,37 +83,40 @@ ALLOWED_ORIGINS = [
     "https://proyectojva.free.nf",
     "https://iestpjva.edu.pe",
     "http://iestpjva.edu.pe",
-    # Dominios de Vercel
-    "https://conect-ai-jva.vercel.app",
-    "https://*.vercel.app",
+    "https://conect-ai-jva.vercel.app", # Vercel
 ]
 
 # =============================================================================
 # CONFIGURACIÓN DEL MODELO DE IA
 # =============================================================================
 
+# Configuración de Modelos IA
+# OpenRouter (Modelos Gratuitos solicitados - Orden de prioridad)
 OPENROUTER_MODELS = [
     "meta-llama/llama-3.3-70b-instruct:free",
-    "google/gemma-2-9b-it:free",
+    "google/gemma-2-9b-it:free", # Actualizado a Gemma 2
     "mistralai/mistral-7b-instruct:free",
 ]
 
+# Google Gemini (Modelos solicitados - Orden de prioridad)
 GEMINI_MODELS = [
-    "gemini-2.0-flash",
-    "gemini-1.5-flash",
-    "gemini-1.5-pro",
+    "gemini-2.0-flash",     # Estable y rápido
+    "gemini-1.5-flash",     # Fallback robusto
+    "gemini-1.5-pro",       # Mayor razonamiento
 ]
 
-MAX_TOKENS = 2000
+# Configuración General IA
+MAX_TOKENS = 2000  # Aumentado para permitir respuestas más detalladas
 MODEL_TEMPERATURE = 0.7
-GEMINI_MIN_INTERVAL = 10
-GEMINI_COOLDOWN = 60
+
+# Rate Limiting (Ajustado para evitar 429)
+GEMINI_MIN_INTERVAL = 10  # Segundos entre llamadas (reducido gracias a rotación)
+GEMINI_COOLDOWN = 60      # Segundos de espera tras error (reducido)
 
 # =============================================================================
-# CONFIGURACIÓN DE ARCHIVOS Y CACHE
+# CONFIGURACIÓN DE ARCHIVOS Y CACHE (HÍBRIDO: LOCAL + VERCEL)
 # =============================================================================
 
-# Detectar si estamos en Vercel
 IS_VERCEL = os.environ.get('VERCEL')
 
 if IS_VERCEL:
@@ -95,7 +131,7 @@ else:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     TOKEN_FILE = os.path.join(BASE_DIR, "token.json")
     CACHE_FOLDER = os.path.join(BASE_DIR, "cache_pdfs")
-    # URL de redirección local
+    # URL de redirección local (User provided hardcoded value logic integrated here via variable)
     OAUTH_REDIRECT_URI = "http://localhost:5000/oauth2callback"
     DEBUG_MODE = True
 
@@ -159,6 +195,8 @@ REGLAS DE ORO:
 3.  **NUNCA MENCIONES NOMBRES DE ARCHIVOS PDF**:
     ❌ MAL: "Para más información, consulta el documento '[05] MATRÍCULA 2025 – I.pdf'"
     ✅ BIEN: "Para más información, contacta a Secretaría Académica"
+    
+    Los usuarios NO conocen los nombres internos de los archivos. Solo proporciona la información directamente.
 
 4.  **ORGANIZACIÓN CLARA**:
     - Agrupa información relacionada
@@ -170,6 +208,36 @@ REGLAS DE ORO:
     - NO inventes datos
     - Proporciona información de contacto si la tienes
 
+EJEMPLO DE RESPUESTA CORRECTA (Matrícula):
+
+Según los documentos disponibles, aquí tienes información sobre la matrícula:
+
+• Matrícula Regular: S/. 200.00
+• Pago en Banco de la Nación (Cuenta: 0000289051)
+• Válido para el III y V semestre.
+• Fechas: Del 03 al 28 de marzo del 2025
+
+• Matrícula Extemporánea: S/. 260.00
+• Fechas: Del 31 de marzo al 04 de abril del 2025
+
+• Matrícula por Unidad Didáctica: S/. 50.00 por Unidad Didáctica
+• Para estudiantes que tienen Unidades Didácticas pendientes en semestres anteriores.
+• Fechas: Del 03 al 28 de marzo del 2025
+
+Pasos para la Matrícula Regular:
+
+1. Verifica tu situación académica
+2. Realiza el depósito de S/. 200.00 soles en el Banco de la Nación a la Cuenta Corriente Nro. 0000289051
+3. Realizar el canje del recibo
+4. Registra tus datos en el Libro de Matrícula.
+
+El proceso finaliza cuando recibes tu Ficha de Matrícula mediante la plataforma REGISTRA.
+
+Importante:
+
+• Para los estudiantes que pasan al III y V semestre, deben estar informados sobre su situación académica a través de la plataforma REGISTRA (https://registra.minedu.gob.pe).
+• Si obtuviste el primer puesto de tu salón, estás exonerado del pago de matrícula. Para recibir este beneficio, debes realizar el depósito de S/. 20.00 en el Banco de la Nación.
+
 INFORMACIÓN DEL INSTITUTO:
 - Nombre: IESTP "Juan Velasco Alvarado"
 - Ubicación: Villa María del Triunfo, Lima
@@ -178,6 +246,10 @@ INFORMACIÓN DEL INSTITUTO:
 
 RECUERDA: Sé directo, útil y NUNCA menciones nombres de archivos PDF.
 """
+
+# =============================================================================
+# NOMBRES DE ARCHIVOS PDF ESPERADOS (Mantenido por compatibilidad)
+# =============================================================================
 
 PDF_FILES_MAPPING = {
     "prospecto": "[00] Prospecto",

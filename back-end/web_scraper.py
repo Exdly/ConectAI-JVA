@@ -19,7 +19,6 @@ from config import (
     CACHE_REFRESH_INTERVAL
 )
 
-
 class WebScraper:
     """Clase para extraer información del sitio web del instituto."""
     
@@ -231,7 +230,6 @@ class WebScraper:
                 relevant_content.append(f"--- {url} ---\n{content[:5000]}")
         
         return '\n\n'.join(relevant_content) if relevant_content else ""
-
 
 # Instancia global (singleton)
 _web_scraper = None

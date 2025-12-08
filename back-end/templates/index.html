@@ -1,74 +1,138 @@
 <!DOCTYPE html>
-<html lang="es-PE">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Asistente Virtual - Trámites IESTP Juan Velasco Alvarado</title>
+    <title>Asistente IESTP JVA</title>
+    <!-- CSS -->
+    <link rel="stylesheet" href="/static/styles.css" />
+    <!-- FontAwesome (Íconos) -->
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
     />
-    <link rel="stylesheet" href="/static/styles.css" />
+    <!-- Google Fonts -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap"
+      rel="stylesheet"
+    />
   </head>
   <body>
-    <div class="main-container"></div>
+    <div class="main-container">
+      <!-- El contenido principal de tu página web iría aquí -->
+      <div style="padding: 50px; text-align: center">
+        <img
+          src="https://iestpjva.edu.pe/img/logo.png"
+          alt="Logo JVA"
+          style="max-width: 200px; margin-bottom: 20px"
+        />
+        <h1 style="color: var(--primary)">
+          Bienvenido al IESTP Juan Velasco Alvarado
+        </h1>
+        <p style="color: var(--light-text)">
+          Portal Institucional de demostración
+        </p>
+      </div>
+    </div>
 
-    <!-- Chatbot Container -->
+    <!-- WIDGET DEL CHATBOT -->
     <div class="chatbot-container" id="chatbotContainer">
+      <!-- New Message Badge -->
+      <div class="new-message-badge" id="newMessageBadge" style="display: none">
+        0
+      </div>
+
+      <!-- Header -->
       <div class="chatbot-header" id="chatbotHeader">
-        <h3><i class="fas fa-robot"></i> Asistente ConectAI-JVA</h3>
-        <div class="status-indicator"></div>
+        <h3>
+          <i class="fas fa-robot"></i>
+          <span>Asistente JVA</span>
+          <span class="status-indicator" title="En línea"></span>
+        </h3>
         <div class="chatbot-controls">
-          <button id="minimizeChatbot"><i class="fas fa-minus"></i></button>
-          <button id="closeChatbot"><i class="fas fa-times"></i></button>
+          <button id="minimizeChatbot" title="Minimizar">
+            <i class="fas fa-minus"></i>
+          </button>
+          <button id="closeChatbot" title="Cerrar">
+            <i class="fas fa-times"></i>
+          </button>
         </div>
       </div>
 
+      <!-- Content -->
       <div class="chatbot-content">
-        <div class="chatbot-messages" id="chatbotMessages"></div>
-        <div class="chatbot-suggestions" id="chatbotSuggestions">
-          <div class="suggestion-chip" data-message="matrícula">Matrícula</div>
-          <div class="suggestion-chip" data-message="traslado">Traslado</div>
-          <div class="suggestion-chip" data-message="reserva">
-            Reserva de matrícula
-          </div>
-          <div class="suggestion-chip" data-message="reincorporación">
-            Reincorporación
-          </div>
-          <div class="suggestion-chip" data-message="cambio de turno">
-            Cambio de turno
-          </div>
-          <div class="suggestion-chip" data-message="titulación">
-            Titulación
+        <!-- Messages Area -->
+        <div class="chatbot-messages" id="chatbotMessages">
+          <!-- Mensaje de bienvenida -->
+          <div class="message bot">
+            <div class="message-bubble">
+              <div>
+                👋 ¡Hola! Soy el asistente virtual del IESTP Juan Velasco
+                Alvarado.
+              </div>
+              <div style="margin-top: 10px">
+                Puedo ayudarte con trámites, requisitos, costos o información
+                del proceso de admisión.
+              </div>
+            </div>
           </div>
         </div>
+
+        <!-- Suggestions Chips -->
+        <div class="chatbot-suggestions">
+          <span
+            class="suggestion-chip"
+            data-message="¿Cuáles son los costos de matrícula?"
+            >💰 Matrícula</span
+          >
+          <span
+            class="suggestion-chip"
+            data-message="Requisitos para titulación"
+            >🎓 Titulación</span
+          >
+          <span class="suggestion-chip" data-message="Ver cronograma académico"
+            >📅 Cronograma</span
+          >
+          <span
+            class="suggestion-chip"
+            data-message="¿Cómo realizo un traslado?"
+            >🔄 Traslados</span
+          >
+        </div>
+
+        <!-- Input Area -->
         <div class="chatbot-input-container">
           <input
             type="text"
             class="chatbot-input"
             id="chatbotInput"
-            placeholder="Escribe tu consulta..."
+            placeholder="Escribe tu consulta aquí..."
+            autocomplete="off"
           />
-          <button class="chatbot-send" id="chatbotSend">
+          <button class="chatbot-send" id="chatbotSend" title="Enviar">
             <i class="fas fa-paper-plane"></i>
           </button>
         </div>
       </div>
-
-      <div class="new-message-badge" id="newMessageBadge" style="display: none">
-        0
-      </div>
     </div>
 
-    <!-- Notification -->
+    <!-- Notification Toast -->
     <div class="notification" id="notification">
-      <i class="fas fa-info-circle"></i>
+      <div class="notification-icon">
+        <i class="fas fa-info-circle"></i>
+      </div>
       <div class="notification-content">
-        <div class="notification-title" id="notificationTitle">Título</div>
-        <div class="notification-message" id="notificationMessage">Mensaje</div>
+        <div class="notification-title" id="notificationTitle">
+          Notificación
+        </div>
+        <div class="notification-message" id="notificationMessage">
+          Mensaje de ejemplo
+        </div>
       </div>
     </div>
 
+    <!-- JavaScript -->
     <script src="/static/script.js"></script>
+    <script defer src="/_vercel/speed-insights/script.js"></script>
   </body>
 </html>

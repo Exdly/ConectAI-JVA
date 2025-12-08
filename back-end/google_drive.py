@@ -1,6 +1,8 @@
 """
 Módulo de Google Drive - Lectura de PDFs
 =========================================
+Este módulo maneja la conexión con Google Drive y extracción de texto de PDFs.
+Lee TODOS los PDFs de la carpeta de forma dinámica.
 """
 
 import os
@@ -29,7 +31,6 @@ SCOPES = [
     'https://www.googleapis.com/auth/spreadsheets'
 ]
 
-
 def get_authorization_url() -> str:
     """Genera la URL para que el usuario autorice la aplicación."""
     from urllib.parse import urlencode
@@ -44,7 +45,6 @@ def get_authorization_url() -> str:
     }
     
     return f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
-
 
 def exchange_code_for_tokens(authorization_code: str) -> dict:
     """Intercambia el código de autorización por tokens de acceso."""
@@ -64,95 +64,54 @@ def exchange_code_for_tokens(authorization_code: str) -> dict:
     tokens = response.json()
     
     if 'access_token' in tokens:
-        # En Vercel /tmp es efímero, pero guardamos por si acaso en la sesión actual
-        try:
-            with open(TOKEN_FILE, 'w') as f:
-                json.dump(tokens, f)
-            print("[Google Drive] Tokens guardados temporalmente")
-        except Exception as e:
-            print(f"[Google Drive] No se pudo escribir token.json: {e}")
-            
-        # IMPORTANTE: Mostrar el refresh_token para que el usuario lo configure en Vercel
-        if 'refresh_token' in tokens:
-            print(f"[AUTH] REFRESH TOKEN OBTENIDO: {tokens['refresh_token']}")
-            print("[AUTH] Por favor, agrega este token como variable de entorno GOOGLE_REFRESH_TOKEN en Vercel.")
+        with open(TOKEN_FILE, 'w') as f:
+            json.dump(tokens, f)
+        print("[Google Drive] Tokens guardados exitosamente")
     
     return tokens
 
-
 def get_credentials() -> Optional[Credentials]:
-    """Obtiene las credenciales, priorizando Environment Variables para Vercel."""
-    creds = None
+    """Obtiene las credenciales de Google, refrescándolas si es necesario."""
+    if not os.path.exists(TOKEN_FILE):
+        return None
     
-    # 1. Estrategia Preferida: Variable de Entorno (Vercel Persistente)
-    refresh_token_env = os.environ.get('GOOGLE_REFRESH_TOKEN')
-    
-    if refresh_token_env:
-        try:
-            creds = Credentials(
-                token=None,  # Se regenerará con el refresh_token
-                refresh_token=refresh_token_env,
-                token_uri='https://oauth2.googleapis.com/token',
-                client_id=GOOGLE_CLIENT_ID,
-                client_secret=GOOGLE_CLIENT_SECRET,
-                scopes=SCOPES
-            )
-            # Forzar refresh para verificar validez y obtener access_token
+    try:
+        with open(TOKEN_FILE, 'r') as f:
+            token_data = json.load(f)
+        
+        creds = Credentials(
+            token=token_data.get('access_token'),
+            refresh_token=token_data.get('refresh_token'),
+            token_uri='https://oauth2.googleapis.com/token',
+            client_id=GOOGLE_CLIENT_ID,
+            client_secret=GOOGLE_CLIENT_SECRET,
+            scopes=SCOPES
+        )
+        
+        if creds.expired and creds.refresh_token:
             creds.refresh(Request())
-            print("[Google Drive] Autenticado usando variable de entorno GOOGLE_REFRESH_TOKEN")
-            return creds
-        except Exception as e:
-            print(f"[Google Drive] Error autenticando con variable de entorno: {e}")
-            # Fallback a archivo si falla
-    
-    # 2. Estrategia Local/Temporal: Archivo token.json
-    if os.path.exists(TOKEN_FILE):
-        try:
-            with open(TOKEN_FILE, 'r') as f:
-                token_data = json.load(f)
-            
-            creds = Credentials(
-                token=token_data.get('access_token'),
-                refresh_token=token_data.get('refresh_token'),
-                token_uri='https://oauth2.googleapis.com/token',
-                client_id=GOOGLE_CLIENT_ID,
-                client_secret=GOOGLE_CLIENT_SECRET,
-                scopes=SCOPES
-            )
-            
-            if creds.expired and creds.refresh_token:
-                creds.refresh(Request())
-                # Actualizar archivo solo si es posible escribir
-                try:
-                    token_data['access_token'] = creds.token
-                    with open(TOKEN_FILE, 'w') as f:
-                        json.dump(token_data, f)
-                    print("[Google Drive] Token de archivo refrescado")
-                except:
-                    pass
-            
-            return creds
-        except Exception as e:
-            print(f"[Google Drive] Error al leer token.json: {e}")
-    
-    return None
-
+            token_data['access_token'] = creds.token
+            with open(TOKEN_FILE, 'w') as f:
+                json.dump(token_data, f)
+            print("[Google Drive] Token refrescado")
+        
+        return creds
+        
+    except Exception as e:
+        print(f"[Google Drive] Error al obtener credenciales: {e}")
+        return None
 
 def is_authenticated() -> bool:
     """Verifica si hay una sesión autenticada válida."""
-    try:
-        creds = get_credentials()
-        return creds is not None and creds.valid
-    except:
-        return False
-
+    creds = get_credentials()
+    return creds is not None and creds.valid
 
 class GoogleDriveManager:
     """Clase para manejar la conexión y lectura de archivos de Google Drive."""
     
     def __init__(self):
         self.service = None
-        self.pdf_cache: Dict[str, Dict] = {}
+        self.pdf_cache: Dict[str, Dict] = {}  # {file_id: {text, modified_time, cached_at}}
         self.files_list_cache: List[Dict] = []
         self.files_list_cached_at: float = 0
         self.all_documents_text: str = ""
@@ -162,19 +121,13 @@ class GoogleDriveManager:
         
         creds = get_credentials()
         if creds:
-            try:
-                self.service = build('drive', 'v3', credentials=creds)
-                print("[Google Drive] Conectado exitosamente")
-            except Exception as e:
-                print(f"[Google Drive] Error al construir servicio: {e}")
+            self.service = build('drive', 'v3', credentials=creds)
+            print("[Google Drive] Conectado exitosamente")
     
     def _ensure_cache_folder(self):
         """Crea la carpeta de cache si no existe."""
         if not os.path.exists(CACHE_FOLDER):
-            try:
-                os.makedirs(CACHE_FOLDER)
-            except:
-                pass # En Vercel root podría fallar, pero /tmp debería funcionar
+            os.makedirs(CACHE_FOLDER)
     
     def _load_cache_from_disk(self):
         """Carga el cache de PDFs desde disco."""
@@ -218,12 +171,18 @@ class GoogleDriveManager:
         return False
     
     def list_pdf_files(self, force_refresh: bool = False) -> List[Dict]:
-        """Lista TODOS los archivos PDF en la carpeta configurada."""
+        """
+        Lista TODOS los archivos PDF en la carpeta configurada.
+        
+        Args:
+            force_refresh: Si True, ignora el cache de la lista
+        """
         if not self.is_ready():
             print("[Google Drive] Servicio no disponible, intentando reconectar...")
             if not self.reconnect():
                 return []
         
+        # Verificar cache de la lista
         cache_age = time.time() - self.files_list_cached_at
         if not force_refresh and self.files_list_cache and cache_age < CACHE_REFRESH_INTERVAL:
             print(f"[Google Drive] Usando lista en cache ({len(self.files_list_cache)} archivos)")
@@ -233,6 +192,7 @@ class GoogleDriveManager:
         for attempt in range(max_retries):
             try:
                 query = f"'{GOOGLE_DRIVE_FOLDER_ID}' in parents and mimeType='application/pdf' and trashed=false"
+                
                 all_files = []
                 page_token = None
                 
@@ -263,19 +223,29 @@ class GoogleDriveManager:
                 if "401" in str(e) or "invalid_grant" in str(e).lower():
                     print("[Google Drive] Token expirado o inválido, reconectando...")
                     self.reconnect()
-                time.sleep(1)
+                time.sleep(1) # Esperar un poco antes de reintentar
         
         return self.files_list_cache if self.files_list_cache else []
     
     def download_pdf(self, file_id: str, file_name: str, modified_time: str = None) -> Optional[str]:
-        """Descarga un PDF y extrae su texto."""
+        """
+        Descarga un PDF y extrae su texto.
+        
+        Args:
+            file_id: ID del archivo en Drive
+            file_name: Nombre del archivo
+            modified_time: Fecha de modificación para verificar cache
+        """
         if not self.is_ready():
             if not self.reconnect():
                 return None
         
+        # Verificar cache
         if file_id in self.pdf_cache:
             cached = self.pdf_cache[file_id]
+            # Si el archivo no ha sido modificado, usar cache
             if modified_time and cached.get('modified_time') == modified_time:
+                # print(f"[Google Drive] Cache válido para: {file_name}")
                 return cached.get('text')
         
         max_retries = 3
@@ -300,6 +270,7 @@ class GoogleDriveManager:
                 
                 full_text = "\n\n".join(text_parts)
                 
+                # Guardar en cache
                 self.pdf_cache[file_id] = {
                     'text': full_text,
                     'modified_time': modified_time,
@@ -317,27 +288,41 @@ class GoogleDriveManager:
                     self.reconnect()
                 time.sleep(1)
         
+        # Intentar devolver cache antiguo si existe
         if file_id in self.pdf_cache:
             print(f"[Google Drive] Usando cache antiguo para {file_name} debido a error")
             return self.pdf_cache[file_id].get('text')
         return None
     
     def get_all_documents_text(self, force_refresh: bool = False) -> str:
-        """Obtiene el texto de TODOS los PDFs en la carpeta."""
+        """
+        Obtiene el texto de TODOS los PDFs en la carpeta.
+        
+        Args:
+            force_refresh: Si True, descarga todos los PDFs de nuevo
+        """
+        # Verificar si hay cache válido
         cache_age = time.time() - self.all_documents_cached_at
         if not force_refresh and self.all_documents_text and cache_age < CACHE_REFRESH_INTERVAL:
             print("[Google Drive] Usando cache de todos los documentos")
             return self.all_documents_text
         
         files = self.list_pdf_files(force_refresh)
-        if not files:
-            return self.all_documents_text # Devolver antiguo si falla
-            
+        
         all_texts = []
         for file in files:
-            text = self.download_pdf(file['id'], file['name'], file.get('modifiedTime'))
+            text = self.download_pdf(
+                file['id'], 
+                file['name'], 
+                file.get('modifiedTime')
+            )
             if text:
-                all_texts.append(f"\n{'='*60}\nDOCUMENTO: {file['name']}\n{'='*60}\n{text}")
+                all_texts.append(
+                    f"\n{'='*60}\n"
+                    f"DOCUMENTO: {file['name']}\n"
+                    f"{'='*60}\n"
+                    f"{text}"
+                )
         
         self.all_documents_text = "\n\n".join(all_texts)
         self.all_documents_cached_at = time.time()
@@ -347,10 +332,22 @@ class GoogleDriveManager:
         return self.all_documents_text
     
     def search_in_documents(self, query: str) -> str:
-        """Busca información en TODOS los documentos."""
+        """
+        Busca información en TODOS los documentos según la consulta.
+        Ya no depende de un mapeo fijo de palabras clave.
+        
+        Args:
+            query: Consulta del usuario
+            
+        Returns:
+            Texto de todos los documentos para que la IA busque
+        """
+        # Obtener todos los documentos (usa cache si está disponible)
         all_text = self.get_all_documents_text()
+        
         if not all_text:
             return "No se pudieron cargar los documentos. Por favor, intenta más tarde."
+        
         return all_text
     
     def refresh_cache(self):
@@ -359,7 +356,7 @@ class GoogleDriveManager:
         self.get_all_documents_text(force_refresh=True)
         print("[Google Drive] Cache actualizado")
 
-
+# Instancia global (singleton)
 _drive_manager = None
 
 def get_drive_manager() -> GoogleDriveManager:

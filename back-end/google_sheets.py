@@ -14,7 +14,6 @@ from config import GOOGLE_SHEET_ID
 
 from google_drive import get_credentials, is_authenticated
 
-
 class GoogleSheetsManager:
     """Clase para manejar el registro de consultas en Google Sheets."""
     
@@ -365,7 +364,6 @@ class GoogleSheetsManager:
         except Exception as e:
             print(f"[Google Sheets] Error al obtener estadísticas: {e}")
             return {"total": 0, "por_tipo": {}, "error": str(e)}
-
 
 # Instancia global (singleton)
 _sheets_manager = None
