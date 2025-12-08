@@ -128,6 +128,31 @@ class WebScraper:
             print(f"[WebScraper] Limpiadas {removed_count} entradas obsoletas del cache")
             self._save_cache()
 
+    def get_page_content(self, url: str, force_refresh: bool = False) -> Optional[str]:
+        """
+        Obtiene el contenido de una página web (con cache).
+        Args:
+            url: URL de la página
+            force_refresh: Si True, ignora el cache
+        Returns:
+            Contenido de texto de la página
+        """
+        # Verificar cache
+        if not force_refresh and self._is_cache_valid(url):
+            print(f"[WebScraper] Usando cache para: {url}")
+            return self.cache.get(url)
+        
+        # Extraer contenido
+        content = self._extract_text_from_page(url)
+        
+        if content:
+            self.cache[url] = content
+            self.cache_timestamps[url] = time.time()
+            self._save_cache()
+            print(f"[WebScraper] Extraído de {url}: {len(content)} caracteres")
+        
+        return content
+
     def get_all_website_content(self, force_refresh: bool = False) -> str:
         """
         Obtiene el contenido de todas las páginas configuradas.

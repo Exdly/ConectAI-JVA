@@ -629,3 +629,70 @@ body {
     min-height: 260px;
   }
 }
+
+/* Resizers - Desktop Only */
+.chatbot-resizer {
+  display: none;
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  z-index: 10;
+  background: transparent;
+}
+@media (min-width: 1024px) and (pointer: fine) {
+  .chatbot-resizer {
+    display: block;
+  }
+}
+.resizer-top-left {
+  top: -5px;
+  left: -5px;
+  cursor: nw-resize;
+}
+.resizer-top-right {
+  top: -5px;
+  right: -5px;
+  cursor: ne-resize;
+}
+.resizer-bottom-left {
+  bottom: -5px;
+  left: -5px;
+  cursor: sw-resize;
+}
+.resizer-bottom-right {
+  bottom: -5px;
+  right: -5px;
+  cursor: se-resize;
+}
+.resizer-left {
+  top: 10px;
+  bottom: 10px;
+  left: -5px;
+  width: 10px;
+  height: auto;
+  cursor: w-resize;
+}
+.resizer-right {
+  top: 10px;
+  bottom: 10px;
+  right: -5px;
+  width: 10px;
+  height: auto;
+  cursor: e-resize;
+}
+.resizer-top {
+  left: 10px;
+  right: 10px;
+  top: -5px;
+  height: 10px;
+  width: auto;
+  cursor: n-resize;
+}
+.resizer-bottom {
+  left: 10px;
+  right: 10px;
+  bottom: -5px;
+  height: 10px;
+  width: auto;
+  cursor: s-resize;
+}
