@@ -177,15 +177,13 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const checkAuthAndShowMessage = async () => {
+    // Ya no necesitamos mostrar mensaje de autorización
+    // El servidor usa token persistente - los usuarios NO necesitan autorizar
     try {
       const { authenticated } = await fetch(`${CFG.BACKEND}/api/auth/status`).then(r => r.json());
       state.auth = authenticated;
-      if (!state.auth) {
-        if (!Array.from(els.msgs.querySelectorAll(".message.bot")).some(m => m.textContent.toLowerCase().includes("conectar con google"))) {
-          const { auth_url } = await fetch(`${CFG.BACKEND}/api/auth/url`).then(r => r.json());
-          if (auth_url) addLinkMessage("Para usar el asistente, primero conecta tu cuenta:", "Conectar con Google", auth_url);
-        }
-      } else { removeAuthMessages(); }
+      // Simplemente remover cualquier mensaje de auth existente (por si acaso)
+      removeAuthMessages();
     } catch (e) { console.error("Auth check failed:", e); }
   };
 
