@@ -189,6 +189,7 @@ def chat():
     """
     Endpoint principal para procesar mensajes del chatbot.
     Ahora incluye información del sitio web además de los PDFs.
+    NOTA: Ya no bloquea al usuario - usa token persistente del servidor.
     """
     import sys
     print("\n" + "="*50, flush=True)
@@ -197,12 +198,10 @@ def chat():
     sys.stdout.flush()
     
     try:
+        # El servidor usa token persistente - no bloqueamos al usuario
+        # Solo logueamos si no hay autenticación (los PDFs no estarán disponibles)
         if not is_authenticated():
-            return jsonify({
-                "success": False,
-                "error": "not_authenticated",
-                "message": "El servidor no está autenticado con Google. Por favor, autoriza primero."
-            }), 401
+            print("[API] ADVERTENCIA: Servidor sin autenticación Google (PDFs no disponibles)")
         
         data = request.get_json()
         
@@ -288,7 +287,7 @@ def chat():
                 "Por favor, intenta nuevamente en unos segundos."
             )
             status = "error_ia"
-            print("[API] Error de IA - NO se guardará en Google Sheets")
+            print("[API] Error de IA - NO se guardará en almacenamiento")
             
             # Si es una actualización, devolver el row_number que vino en la petición
             row_number_input = data.get('row_number')
@@ -311,16 +310,16 @@ def chat():
                     status=status
                 )
                 row_number = int(row_number_input)
-                print(f"[API] Fila {row_number} actualizada en Google Sheets")
+                print(f"[API] ID {row_number} actualizado en Supabase")
             else:
-                # Crear nueva fila
+                # Crear nueva entrada
                 row_number = sheets_manager.log_consultation(
                     user_query=user_message,
                     bot_response=response,
                     query_type=query_type,
                     status=status
                 )
-                print(f"[API] Nueva fila {row_number} creada en Google Sheets")
+                print(f"[API] Nueva entrada creada (ID: {row_number})")
         
         return jsonify({
             "success": True,
@@ -343,10 +342,12 @@ def chat():
 def list_documents():
     """Endpoint para listar los documentos disponibles."""
     try:
+        # Solo verificamos autenticación para este endpoint específico de admin
         if not is_authenticated():
             return jsonify({
                 "success": False,
-                "error": "not_authenticated"
+                "error": "not_authenticated",
+                "message": "Este endpoint requiere autenticación del administrador"
             }), 401
         
         drive_manager = get_drive_manager()

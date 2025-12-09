@@ -59,6 +59,17 @@ GOOGLE_DRIVE_FOLDER_ID = "1PGUC-Schws7p342zwmZx8LK7Eb153cC8"
 GOOGLE_SHEET_ID = "1kU5OGEHdM8eilXVnCWaj1cT5Ob3qL8Rk90Dc2ApBTUw"
 
 # =============================================================================
+# CONFIGURACIÓN DE SUPABASE (Almacenamiento Híbrido)
+# =============================================================================
+
+# URL y API Key de Supabase
+SUPABASE_URL = os.getenv("SUPABASE_URL", "https://pkebuitdredwaegqwkcn.supabase.co")
+SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBrZWJ1aXRkcmVkd2FlZ3F3a2NuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUzMDU5MzYsImV4cCI6MjA4MDg4MTkzNn0.N1wNSaxgJBf2n5mZSI_MKOYNf6Xl_7Hxa_tZ9SJiPSo")
+
+# Límite de filas en Google Sheets (para no sobrecargar)
+SHEETS_MAX_ROWS = 50
+
+# =============================================================================
 # CREDENCIALES OAUTH 2.0
 # =============================================================================
 

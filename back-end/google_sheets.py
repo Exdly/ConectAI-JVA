@@ -1,8 +1,9 @@
 """
-Módulo de Google Sheets - Registro de Consultas
-================================================
-Este módulo maneja el registro de consultas en Google Sheets.
-Usa OAuth 2.0 para Aplicación Web (sin archivo credentials.json).
+Módulo de Almacenamiento Híbrido - Supabase + Google Sheets
+============================================================
+Este módulo maneja el registro de consultas usando:
+- Supabase: Almacenamiento principal (todas las consultas)
+- Google Sheets: Visualización de las últimas N consultas (no se sobrecarga)
 """
 
 import os
@@ -10,46 +11,78 @@ from datetime import datetime
 from typing import Optional
 from googleapiclient.discovery import build
 
-from config import GOOGLE_SHEET_ID
+from config import GOOGLE_SHEET_ID, SUPABASE_URL, SUPABASE_ANON_KEY, SHEETS_MAX_ROWS
 
 from google_drive import get_credentials, is_authenticated
 
-class GoogleSheetsManager:
-    """Clase para manejar el registro de consultas en Google Sheets."""
+# Import Supabase
+try:
+    from supabase import create_client, Client
+    SUPABASE_AVAILABLE = True
+except ImportError:
+    SUPABASE_AVAILABLE = False
+    print("[Storage] ADVERTENCIA: Supabase no instalado. Ejecuta: pip install supabase")
+
+
+class HybridStorageManager:
+    """Clase para manejar el almacenamiento híbrido (Supabase + Google Sheets)."""
     
     def __init__(self):
-        self.service = None
+        self.sheets_service = None
+        self.supabase: Optional[Client] = None
         
-        # Intentar conectar si hay credenciales
+        # Inicializar Supabase
+        if SUPABASE_AVAILABLE and SUPABASE_URL and SUPABASE_ANON_KEY:
+            try:
+                self.supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+                print("[Storage] Supabase conectado exitosamente")
+            except Exception as e:
+                print(f"[Storage] Error conectando a Supabase: {e}")
+        
+        # Inicializar Google Sheets (si hay credenciales)
         creds = get_credentials()
         if creds:
-            self.service = build('sheets', 'v4', credentials=creds)
-            self._ensure_headers()
-            print("[Google Sheets] Conectado exitosamente")
+            try:
+                self.sheets_service = build('sheets', 'v4', credentials=creds)
+                self._ensure_headers()
+                print("[Storage] Google Sheets conectado exitosamente")
+            except Exception as e:
+                print(f"[Storage] Error conectando a Google Sheets: {e}")
     
     def is_ready(self) -> bool:
-        """Verifica si el servicio está listo para usar."""
-        return self.service is not None
+        """Verifica si al menos un servicio está listo."""
+        return self.supabase is not None or self.sheets_service is not None
+    
+    def is_supabase_ready(self) -> bool:
+        """Verifica si Supabase está listo."""
+        return self.supabase is not None
+    
+    def is_sheets_ready(self) -> bool:
+        """Verifica si Google Sheets está listo."""
+        return self.sheets_service is not None
     
     def reconnect(self):
         """Reconecta con nuevas credenciales."""
         creds = get_credentials()
         if creds:
-            self.service = build('sheets', 'v4', credentials=creds)
-            self._ensure_headers()
-            print("[Google Sheets] Reconectado exitosamente")
-            return True
+            try:
+                self.sheets_service = build('sheets', 'v4', credentials=creds)
+                self._ensure_headers()
+                print("[Storage] Google Sheets reconectado exitosamente")
+                return True
+            except Exception as e:
+                print(f"[Storage] Error reconectando a Google Sheets: {e}")
         return False
     
     def _ensure_headers(self):
-        """Asegura que la hoja tenga los encabezados correctos."""
-        if not self.is_ready():
+        """Asegura que Google Sheets tenga los encabezados correctos."""
+        if not self.is_sheets_ready():
             return
         
         try:
-            result = self.service.spreadsheets().values().get(
+            result = self.sheets_service.spreadsheets().values().get(
                 spreadsheetId=GOOGLE_SHEET_ID,
-                range='A1:I1'  # Ampliado para incluir columnas de feedback
+                range='A1:I1'
             ).execute()
             
             values = result.get('values', [])
@@ -62,76 +95,189 @@ class GoogleSheetsManager:
                     'Respuesta del Bot',
                     'Tipo de Consulta',
                     'Estado',
-                    'Feedback',           # Nueva columna
-                    'Comentario Feedback', # Nueva columna
-                    'ID Mensaje'           # Nueva columna
+                    'Feedback',
+                    'Comentario Feedback',
+                    'ID Supabase'  # Nuevo: referencia a Supabase
                 ]]
                 
-                self.service.spreadsheets().values().update(
+                self.sheets_service.spreadsheets().values().update(
                     spreadsheetId=GOOGLE_SHEET_ID,
                     range='A1:I1',
                     valueInputOption='RAW',
                     body={'values': headers}
                 ).execute()
                 
-                print("[Google Sheets] Encabezados actualizados con columnas de feedback")
+                print("[Storage] Encabezados de Google Sheets actualizados")
         except Exception as e:
-            print(f"[Google Sheets] Error al verificar encabezados: {e}")
+            print(f"[Storage] Error al verificar encabezados: {e}")
     
-    def find_recent_duplicate(self, user_query: str, time_window_seconds: int = 60) -> int:
-        """Busca una fila reciente con la misma consulta del usuario.
-        Retorna el número de fila si encuentra un duplicado, 0 si no."""
-        if not self.is_ready():
+    def _save_to_supabase(
+        self,
+        user_query: str,
+        bot_response: str,
+        query_type: str = "general",
+        status: str = "completado",
+        feedback: str = "",
+        comment: str = ""
+    ) -> Optional[int]:
+        """Guarda una consulta en Supabase. Retorna el ID insertado."""
+        if not self.is_supabase_ready():
+            return None
+        
+        try:
+            now = datetime.now()
+            data = {
+                "fecha": now.strftime("%Y-%m-%d"),
+                "hora": now.strftime("%H:%M:%S"),
+                "consulta_usuario": user_query[:5000],
+                "respuesta_bot": bot_response[:50000],
+                "tipo_consulta": query_type,
+                "estado": status,
+                "feedback": feedback,
+                "comentario_feedback": comment
+            }
+            
+            result = self.supabase.table("consultas").insert(data).execute()
+            
+            if result.data and len(result.data) > 0:
+                supabase_id = result.data[0].get('id')
+                print(f"[Storage] Supabase: Consulta guardada (ID: {supabase_id})")
+                return supabase_id
+            return None
+            
+        except Exception as e:
+            print(f"[Storage] Error guardando en Supabase: {e}")
+            return None
+    
+    def _update_supabase(
+        self,
+        supabase_id: int,
+        user_query: str = None,
+        bot_response: str = None,
+        query_type: str = None,
+        status: str = None,
+        feedback: str = None,
+        comment: str = None
+    ) -> bool:
+        """Actualiza una consulta existente en Supabase."""
+        if not self.is_supabase_ready() or not supabase_id:
+            return False
+        
+        try:
+            now = datetime.now()
+            data = {"fecha": now.strftime("%Y-%m-%d"), "hora": now.strftime("%H:%M:%S")}
+            
+            if user_query is not None:
+                data["consulta_usuario"] = user_query[:5000]
+            if bot_response is not None:
+                data["respuesta_bot"] = bot_response[:50000]
+            if query_type is not None:
+                data["tipo_consulta"] = query_type
+            if status is not None:
+                data["estado"] = status
+            if feedback is not None:
+                data["feedback"] = feedback
+            if comment is not None:
+                data["comentario_feedback"] = comment
+            
+            self.supabase.table("consultas").update(data).eq("id", supabase_id).execute()
+            print(f"[Storage] Supabase: Consulta actualizada (ID: {supabase_id})")
+            return True
+            
+        except Exception as e:
+            print(f"[Storage] Error actualizando Supabase: {e}")
+            return False
+    
+    def _sync_to_sheets(
+        self,
+        supabase_id: int,
+        user_query: str,
+        bot_response: str,
+        query_type: str,
+        status: str,
+        feedback: str = "",
+        comment: str = ""
+    ) -> int:
+        """Sincroniza la consulta a Google Sheets (mantiene solo últimas N filas)."""
+        if not self.is_sheets_ready():
             return 0
         
         try:
-            from datetime import datetime, timedelta
+            now = datetime.now()
             
-            # Obtener todas las filas recientes
-            result = self.service.spreadsheets().values().get(
+            # Primero, verificar cuántas filas hay
+            result = self.sheets_service.spreadsheets().values().get(
                 spreadsheetId=GOOGLE_SHEET_ID,
-                range='A:F'  # Fecha, Hora, Consulta, Respuesta, Tipo, Estado
+                range='A:A'
             ).execute()
             
             values = result.get('values', [])
-            if len(values) <= 1:  # Solo encabezados o vacío
-                return 0
+            current_rows = len(values)
             
-            now = datetime.now()
-            cutoff_time = now - timedelta(seconds=time_window_seconds)
+            # Si hay más de SHEETS_MAX_ROWS, eliminar filas antiguas
+            if current_rows > SHEETS_MAX_ROWS:
+                rows_to_delete = current_rows - SHEETS_MAX_ROWS
+                # Eliminar filas desde la 2 (después del encabezado)
+                requests = [{
+                    "deleteDimension": {
+                        "range": {
+                            "sheetId": 0,
+                            "dimension": "ROWS",
+                            "startIndex": 1,  # Después del encabezado
+                            "endIndex": 1 + rows_to_delete
+                        }
+                    }
+                }]
+                self.sheets_service.spreadsheets().batchUpdate(
+                    spreadsheetId=GOOGLE_SHEET_ID,
+                    body={"requests": requests}
+                ).execute()
+                print(f"[Storage] Sheets: Eliminadas {rows_to_delete} filas antiguas")
             
-            # Buscar desde el final (filas más recientes)
-            for i in range(len(values) - 1, 0, -1):  # Empezar desde la última fila
-                row = values[i]
-                if len(row) < 3:  # Necesitamos al menos fecha, hora, consulta
-                    continue
-                
+            # Agregar nueva fila
+            feedback_display = ""
+            if feedback == "like":
+                feedback_display = "👍 Útil"
+            elif feedback == "dislike":
+                feedback_display = "👎 No útil"
+            
+            row = [[
+                now.strftime("%Y-%m-%d"),
+                now.strftime("%H:%M:%S"),
+                user_query[:1000],
+                bot_response[:5000],  # Limitamos más en Sheets
+                query_type,
+                status,
+                feedback_display,
+                comment[:500] if comment else "",
+                str(supabase_id) if supabase_id else ""
+            ]]
+            
+            result = self.sheets_service.spreadsheets().values().append(
+                spreadsheetId=GOOGLE_SHEET_ID,
+                range='A:I',
+                valueInputOption='RAW',
+                insertDataOption='INSERT_ROWS',
+                body={'values': row}
+            ).execute()
+            
+            # Extraer número de fila
+            updated_range = result.get('updates', {}).get('updatedRange', '')
+            row_number = 0
+            if updated_range:
                 try:
-                    # Parsear fecha y hora
-                    fecha_str = row[0]  # YYYY-MM-DD
-                    hora_str = row[1]   # HH:MM:SS
-                    consulta = row[2] if len(row) > 2 else ""
-                    
-                    row_datetime = datetime.strptime(f"{fecha_str} {hora_str}", "%Y-%m-%d %H:%M:%S")
-                    
-                    # Si la fila es muy antigua, dejamos de buscar
-                    if row_datetime < cutoff_time:
-                        break
-                    
-                    # Comparar consultas (normalizar espacios y mayúsculas)
-                    if consulta.strip().lower() == user_query[:1000].strip().lower():
-                        row_number = i + 1  # +1 porque las filas empiezan en 1
-                        print(f"[Google Sheets] Duplicado encontrado en fila {row_number}")
-                        return row_number
-                        
-                except Exception as e:
-                    # Si hay error parseando esta fila, continuar con la siguiente
-                    continue
+                    import re
+                    match = re.search(r'!A(\d+):', updated_range)
+                    if match:
+                        row_number = int(match.group(1))
+                except:
+                    pass
             
-            return 0
+            print(f"[Storage] Sheets: Sincronizado en fila {row_number}")
+            return row_number
             
         except Exception as e:
-            print(f"[Google Sheets] Error al buscar duplicados: {e}")
+            print(f"[Storage] Error sincronizando a Sheets: {e}")
             return 0
     
     def log_consultation(
@@ -141,152 +287,75 @@ class GoogleSheetsManager:
         query_type: str = "general",
         status: str = "completado"
     ) -> int:
-        """Registra una consulta y devuelve el número de fila insertada (0 si falla).
-        Si encuentra un duplicado reciente, actualiza esa fila en lugar de crear una nueva."""
+        """
+        Registra una consulta (almacenamiento híbrido).
+        Retorna el ID de Supabase (no el row_number de Sheets).
+        """
         if not self.is_ready():
-            print("[Google Sheets] Servicio no disponible")
-            return False
-        
-        try:
-            # Primero, buscar si hay un duplicado reciente
-            duplicate_row = self.find_recent_duplicate(user_query, time_window_seconds=60)
-            
-            if duplicate_row > 0:
-                # Actualizar la fila existente en lugar de crear una nueva
-                print(f"[Google Sheets] Actualizando fila duplicada {duplicate_row}")
-                success = self.update_consultation(
-                    row_number=duplicate_row,
-                    user_query=user_query,
-                    bot_response=bot_response,
-                    query_type=query_type,
-                    status=status
-                )
-                return duplicate_row if success else 0
-            
-            # No hay duplicado, crear nueva fila
-            now = datetime.now()
-            
-            row = [[
-                now.strftime("%Y-%m-%d"),
-                now.strftime("%H:%M:%S"),
-                user_query[:1000],  # Aumentado de 500 a 1000
-                bot_response[:50000],  # Aumentado de 5000 a 50000 (límite de Google Sheets)
-                query_type,
-                status,
-                "",  # Feedback (se llenará después)
-                "",  # Comentario feedback
-                ""   # ID Mensaje
-            ]]
-            
-            result = self.service.spreadsheets().values().append(
-                spreadsheetId=GOOGLE_SHEET_ID,
-                range='A:I',
-                valueInputOption='RAW',
-                insertDataOption='INSERT_ROWS',
-                body={'values': row}
-            ).execute()
-            
-            # Extraer el rango actualizado para obtener el número de fila
-            # Ejemplo de updatedRange: "Hoja 1!A108:I108"
-            updated_range = result.get('updates', {}).get('updatedRange', '')
-            row_number = 0
-            if updated_range:
-                try:
-                    # Extraer el número después de la última letra y antes de : o final
-                    import re
-                    match = re.search(r'!A(\d+):', updated_range)
-                    if match:
-                        row_number = int(match.group(1))
-                except:
-                    pass
-            
-            print(f"[Google Sheets] Consulta registrada en fila {row_number}: {query_type}")
-            return row_number
-            
-        except Exception as e:
-            print(f"[Google Sheets] Error al registrar consulta: {e}")
+            print("[Storage] Ningún servicio disponible")
             return 0
-
+        
+        # 1. Guardar en Supabase (principal)
+        supabase_id = self._save_to_supabase(
+            user_query=user_query,
+            bot_response=bot_response,
+            query_type=query_type,
+            status=status
+        )
+        
+        # 2. Sincronizar a Google Sheets (visualización)
+        self._sync_to_sheets(
+            supabase_id=supabase_id or 0,
+            user_query=user_query,
+            bot_response=bot_response,
+            query_type=query_type,
+            status=status
+        )
+        
+        return supabase_id or 0
+    
     def update_consultation(
         self,
-        row_number: int,
+        row_number: int,  # Ahora es supabase_id
         user_query: str,
         bot_response: str,
         query_type: str = "general",
         status: str = "completado"
     ) -> bool:
-        """Actualiza una consulta existente en la fila especificada."""
-        if not self.is_ready() or row_number <= 0:
+        """Actualiza una consulta existente en Supabase."""
+        if not self.is_supabase_ready() or row_number <= 0:
             return False
-            
-        try:
-            now = datetime.now()
-            
-            # Actualizamos columnas A a F (Fecha, Hora, Consulta, Respuesta, Tipo, Estado)
-            # Mantenemos el feedback si existía (columnas G, H, I no se tocan aquí)
-            range_name = f"A{row_number}:F{row_number}"
-            
-            row = [[
-                now.strftime("%Y-%m-%d"),
-                now.strftime("%H:%M:%S"),
-                user_query[:1000],  # Aumentado de 500 a 1000
-                bot_response[:50000],  # Aumentado de 5000 a 50000 (límite de Google Sheets)
-                query_type,
-                status
-            ]]
-            
-            self.service.spreadsheets().values().update(
-                spreadsheetId=GOOGLE_SHEET_ID,
-                range=range_name,
-                valueInputOption='RAW',
-                body={'values': row}
-            ).execute()
-            
-            print(f"[Google Sheets] Consulta actualizada en fila {row_number}")
-            return True
-            
-        except Exception as e:
-            print(f"[Google Sheets] Error al actualizar consulta en fila {row_number}: {e}")
-            return False
+        
+        return self._update_supabase(
+            supabase_id=row_number,
+            user_query=user_query,
+            bot_response=bot_response,
+            query_type=query_type,
+            status=status
+        )
     
     def update_feedback(
         self,
-        row_number: int,
+        row_number: int,  # Ahora es supabase_id
         feedback_type: str,
         comment: str = ""
     ) -> bool:
-        """Actualiza el feedback en una fila existente."""
-        if not self.is_ready() or row_number <= 0:
+        """Actualiza el feedback en Supabase."""
+        if not self.is_supabase_ready() or row_number <= 0:
             return False
-            
-        try:
-            # Determinar el valor a mostrar
-            if feedback_type == "like":
-                feedback_display = "👍 Útil"
-            elif feedback_type == "dislike":
-                feedback_display = "👎 No útil"
-            else:
-                feedback_display = "" # Limpiar si es 'none' u otro
-            
-            # Columnas G (7) y H (8) corresponden a Feedback y Comentario
-            # En notación A1, G{row}:H{row}
-            range_name = f"G{row_number}:H{row_number}"
-            
-            values = [[feedback_display, comment]]
-            
-            self.service.spreadsheets().values().update(
-                spreadsheetId=GOOGLE_SHEET_ID,
-                range=range_name,
-                valueInputOption='RAW',
-                body={'values': values}
-            ).execute()
-            
-            print(f"[Google Sheets] Feedback actualizado en fila {row_number}: {feedback_type}")
-            return True
-            
-        except Exception as e:
-            print(f"[Google Sheets] Error al actualizar feedback: {e}")
-            return False
+        
+        # Determinar el valor a guardar
+        feedback_value = ""
+        if feedback_type == "like":
+            feedback_value = "👍 Útil"
+        elif feedback_type == "dislike":
+            feedback_value = "👎 No útil"
+        
+        return self._update_supabase(
+            supabase_id=row_number,
+            feedback=feedback_value,
+            comment=comment
+        )
     
     def log_feedback(
         self,
@@ -296,81 +365,63 @@ class GoogleSheetsManager:
         comment: str = "",
         message_id: str = ""
     ) -> bool:
-        """Registra el feedback del usuario sobre una respuesta."""
+        """Registra feedback como nueva entrada (fallback)."""
         if not self.is_ready():
-            print("[Google Sheets] Servicio no disponible")
             return False
         
-        try:
-            now = datetime.now()
-            
-            # Determinar el emoji/texto para el tipo de feedback
-            feedback_display = "👍 Útil" if feedback_type == "like" else "👎 No útil"
-            
-            row = [[
-                now.strftime("%Y-%m-%d"),
-                now.strftime("%H:%M:%S"),
-                user_query[:500],
-                bot_response[:5000],
-                "feedback",
-                "registrado",
-                feedback_display,
-                comment[:1000] if comment else "",
-                str(message_id)
-            ]]
-            
-            self.service.spreadsheets().values().append(
-                spreadsheetId=GOOGLE_SHEET_ID,
-                range='A:I',
-                valueInputOption='RAW',
-                insertDataOption='INSERT_ROWS',
-                body={'values': row}
-            ).execute()
-            
-            print(f"[Google Sheets] Feedback registrado: {feedback_type}")
-            return True
-            
-        except Exception as e:
-            print(f"[Google Sheets] Error al registrar feedback: {e}")
-            return False
+        feedback_value = "👍 Útil" if feedback_type == "like" else "👎 No útil"
+        
+        supabase_id = self._save_to_supabase(
+            user_query=user_query,
+            bot_response=bot_response,
+            query_type="feedback",
+            status="registrado",
+            feedback=feedback_value,
+            comment=comment
+        )
+        
+        return supabase_id is not None
     
     def get_statistics(self) -> dict:
-        """Obtiene estadísticas de las consultas registradas."""
-        if not self.is_ready():
-            return {"total": 0, "por_tipo": {}, "error": "Servicio no disponible"}
+        """Obtiene estadísticas de las consultas (desde Supabase)."""
+        if not self.is_supabase_ready():
+            return {"total": 0, "por_tipo": {}, "error": "Supabase no disponible"}
         
         try:
-            result = self.service.spreadsheets().values().get(
-                spreadsheetId=GOOGLE_SHEET_ID,
-                range='A:F'
-            ).execute()
+            # Contar total
+            result = self.supabase.table("consultas").select("id", count="exact").execute()
+            total = result.count if hasattr(result, 'count') else len(result.data)
             
-            values = result.get('values', [])
-            
-            if len(values) <= 1:
-                return {"total": 0, "por_tipo": {}}
-            
+            # Contar por tipo (simplificado)
+            all_data = self.supabase.table("consultas").select("tipo_consulta").execute()
             tipo_count = {}
-            for row in values[1:]:
-                if len(row) >= 5:
-                    tipo = row[4]
-                    tipo_count[tipo] = tipo_count.get(tipo, 0) + 1
+            for row in all_data.data:
+                tipo = row.get('tipo_consulta', 'general')
+                tipo_count[tipo] = tipo_count.get(tipo, 0) + 1
             
             return {
-                "total": len(values) - 1,
+                "total": total,
                 "por_tipo": tipo_count
             }
             
         except Exception as e:
-            print(f"[Google Sheets] Error al obtener estadísticas: {e}")
+            print(f"[Storage] Error obteniendo estadísticas: {e}")
             return {"total": 0, "por_tipo": {}, "error": str(e)}
+
+
+# =============================================================================
+# COMPATIBILIDAD: Mantener la interfaz anterior
+# =============================================================================
+
+# Alias para compatibilidad (GoogleSheetsManager ahora es HybridStorageManager)
+GoogleSheetsManager = HybridStorageManager
 
 # Instancia global (singleton)
 _sheets_manager = None
 
-def get_sheets_manager() -> GoogleSheetsManager:
-    """Obtiene la instancia del manejador de Google Sheets."""
+def get_sheets_manager() -> HybridStorageManager:
+    """Obtiene la instancia del manejador de almacenamiento híbrido."""
     global _sheets_manager
     if _sheets_manager is None:
-        _sheets_manager = GoogleSheetsManager()
+        _sheets_manager = HybridStorageManager()
     return _sheets_manager
