@@ -153,10 +153,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const updateSendBtn = (stop) => { els.sendBtn.innerHTML = stop ? '<i class="fas fa-stop"></i>' : '<i class="fas fa-paper-plane"></i>'; els.sendBtn.title = stop ? "Detener" : "Enviar"; els.sendBtn.classList.toggle("stop", stop); };
   
   const startEdit = (id, text, rowNum) => {
+    // Obtener el row_number del mensaje del bot asociado (siguiente hermano)
+    const userMsg = els.msgs.querySelector(`.message[data-id="${id}"]`);
+    let botRowNum = rowNum;
+    if (userMsg) {
+      const botMsg = userMsg.nextElementSibling;
+      if (botMsg && botMsg.classList.contains("bot")) {
+        botRowNum = parseInt(botMsg.dataset.rowNumber || 0);
+      }
+    }
     els.input.value = text; els.input.focus();
-    Object.assign(els.input.dataset, { editId: id, editRow: rowNum });
-    // NO eliminamos el mensaje todavía. Se reemplazará al enviar.
-    // Solo visualmente indicamos que se está editando (opcional, por ahora solo focus)
+    Object.assign(els.input.dataset, { editId: id, editRow: botRowNum });
   };
 
   const copyToClipboard = async (text, btn) => {

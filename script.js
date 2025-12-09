@@ -137,13 +137,21 @@ document.addEventListener("DOMContentLoaded", () => {
   const updateSendBtn = (stop) => { els.sendBtn.innerHTML = stop ? '<i class="fas fa-stop"></i>' : '<i class="fas fa-paper-plane"></i>'; els.sendBtn.title = stop ? "Detener" : "Enviar"; els.sendBtn.classList.toggle("stop", stop); };
   
   const startEdit = (id, text, rowNum) => {
-    els.input.value = text; els.input.focus(); Object.assign(els.input.dataset, { editId: id, editRow: rowNum });
+    // Obtener el row_number del mensaje del bot asociado (siguiente hermano) antes de eliminarlo
     const msgDiv = els.msgs.querySelector(`.message[data-id="${id}"]`);
+    let botRowNum = rowNum;
     if (msgDiv) {
       const next = msgDiv.nextElementSibling;
-      if (next && next.classList.contains("bot")) { state.history = state.history.filter(h => h.id !== next.dataset.id); next.remove(); }
-      msgDiv.remove(); state.history = state.history.filter(h => h.id !== id);
+      if (next && next.classList.contains("bot")) {
+        botRowNum = parseInt(next.dataset.rowNumber || 0);
+        state.history = state.history.filter(h => h.id !== next.dataset.id);
+        next.remove();
+      }
+      msgDiv.remove();
+      state.history = state.history.filter(h => h.id !== id);
     }
+    els.input.value = text; els.input.focus();
+    Object.assign(els.input.dataset, { editId: id, editRow: botRowNum });
   };
 
   const copyToClipboard = async (text) => {

@@ -325,6 +325,7 @@ def chat():
             "success": True,
             "response": response,
             "query_type": query_type,
+            "id": str(row_number),  # ID único para el frontend
             "row_number": row_number  # Devolver el número de fila al frontend
         })
         
