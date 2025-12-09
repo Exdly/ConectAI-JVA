@@ -81,11 +81,11 @@ document.addEventListener("DOMContentLoaded", () => {
     
     // Actions & Utils
     if (!isUser && !msg.includes("Autorizar Google")) {
-      msgDiv.append(h("button", { className: "copy-message-btn", title: "Copiar", onclick: (e) => { e.stopPropagation(); copyToClipboard(msg); }, innerHTML: '<i class="fas fa-copy"></i>' }));
+      msgDiv.append(h("button", { className: "copy-message-btn", title: "Copiar", onclick: (e) => { e.stopPropagation(); copyToClipboard(msg, e.currentTarget); }, innerHTML: '<i class="fas fa-copy"></i>' }));
       const btns = [
         { cls: "like-btn", icon: "thumbs-up", title: "Útil", click: (e) => handleFeedback(id, true, e.currentTarget) },
         { cls: "dislike-btn", icon: "thumbs-down", title: "No útil", click: (e) => handleFeedback(id, false, e.currentTarget) },
-        { cls: "regenerate-btn", icon: "redo", title: "Regenerar", click: () => processMessage(state.lastUserMsg, true) }
+        { cls: "regenerate-btn", icon: "redo", title: "Regenerar", click: () => handleRegenerate() }
       ];
       msgDiv.append(h("div", { className: "message-actions" }, ...btns.map(b => h("button", { className: `action-btn ${b.cls}`, title: b.title, onclick: b.click, innerHTML: `<i class="fas fa-${b.icon}"></i>` }))));
     } else if (isUser) {
@@ -109,8 +109,22 @@ document.addEventListener("DOMContentLoaded", () => {
     const isEdit = !!els.input.dataset.editId, editId = els.input.dataset.editId, rowNum = parseInt(els.input.dataset.editRow || 0);
     delete els.input.dataset.editId; delete els.input.dataset.editRow;
     
-    // Si regeneramos, NO mostramos burbuja nueva. Si es edit, o msg nuevo, si.
-    const currentMsgId = (isRegen && !isEdit) ? null : (isEdit ? renderMessage(msg, true, editId, rowNum) : renderMessage(msg, true));
+    // Si es EDIT: Buscar el mensaje original y su respuesta, y eliminarlos AHORA
+    if (isEdit && editId) {
+      const oldMsg = els.msgs.querySelector(`.message[data-id="${editId}"]`);
+      if (oldMsg) {
+         const next = oldMsg.nextElementSibling;
+         if (next && next.classList.contains("bot")) {
+             state.history = state.history.filter(h => h.id !== next.dataset.id); 
+             next.remove();
+         }
+         oldMsg.remove();
+         state.history = state.history.filter(h => h.id !== editId);
+      }
+    }
+
+    // Si regeneramos, NO mostramos burbuja nueva. Si es edit (ya borramos viejo), o msg nuevo, si.
+    const currentMsgId = (isRegen && !isEdit) ? null : renderMessage(msg, true, editId || Date.now().toString(), rowNum);
     
     showTyping(); updateSendBtn(true);
     try {
@@ -139,18 +153,27 @@ document.addEventListener("DOMContentLoaded", () => {
   const updateSendBtn = (stop) => { els.sendBtn.innerHTML = stop ? '<i class="fas fa-stop"></i>' : '<i class="fas fa-paper-plane"></i>'; els.sendBtn.title = stop ? "Detener" : "Enviar"; els.sendBtn.classList.toggle("stop", stop); };
   
   const startEdit = (id, text, rowNum) => {
-    els.input.value = text; els.input.focus(); Object.assign(els.input.dataset, { editId: id, editRow: rowNum });
-    const msgDiv = els.msgs.querySelector(`.message[data-id="${id}"]`);
-    if (msgDiv) {
-      const next = msgDiv.nextElementSibling;
-      if (next && next.classList.contains("bot")) { state.history = state.history.filter(h => h.id !== next.dataset.id); next.remove(); }
-      msgDiv.remove(); state.history = state.history.filter(h => h.id !== id);
-    }
+    els.input.value = text; els.input.focus();
+    Object.assign(els.input.dataset, { editId: id, editRow: rowNum });
+    // NO eliminamos el mensaje todavía. Se reemplazará al enviar.
+    // Solo visualmente indicamos que se está editando (opcional, por ahora solo focus)
   };
 
-  const copyToClipboard = async (text) => {
-    try { await navigator.clipboard.writeText(text); showNotif("Copiado", "Texto copiado", "success"); }
-    catch { const ta = h("textarea", { value: text, style: { position: "fixed", left: "-9999px" } }); document.body.append(ta); ta.select(); document.execCommand("copy"); ta.remove(); showNotif("Copiado", "Texto copiado", "success"); }
+  const copyToClipboard = async (text, btn) => {
+    try { 
+        await navigator.clipboard.writeText(text); 
+        // Visual feedback en el botón
+        const original = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i>';
+        setTimeout(() => btn.innerHTML = original, 2000);
+    }
+    catch { 
+        const ta = h("textarea", { value: text, style: { position: "fixed", left: "-9999px" } }); 
+        document.body.append(ta); ta.select(); document.execCommand("copy"); ta.remove(); 
+        const original = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i>';
+        setTimeout(() => btn.innerHTML = original, 2000);
+    }
   };
 
   const handleFeedback = async (id, isLike, btn) => {
@@ -159,9 +182,25 @@ document.addEventListener("DOMContentLoaded", () => {
     else {
       const sib = isLike ? btn.nextElementSibling : btn.previousElementSibling; if (sib) sib.classList.remove("active");
       btn.classList.add("active");
-      const comment = !isLike ? prompt("¿Por qué no fue útil? (Opcional)") || "" : "";
-      await sendFeedback(id, type, comment, btn);
+      btn.classList.add("active");
+      // UX Standard: Sin prompt intrusivo. Solo enviar feedback negativo.
+      await sendFeedback(id, type, "", btn);
     }
+  };
+
+  const handleRegenerate = () => {
+    // 1. Encontrar el último mensaje del asistente
+    const lastIdx = state.history.findLastIndex(h => h.role === "assistant");
+    if (lastIdx !== -1) {
+      const msgId = state.history[lastIdx].id;
+      // 2. Eliminar del DOM
+      const msgDiv = els.msgs.querySelector(`.message[data-id="${msgId}"]`);
+      if (msgDiv) msgDiv.remove();
+      // 3. Eliminar del historial
+      state.history.splice(lastIdx, 1);
+    }
+    // 4. Procesar como regeneración (sin repintar usuario)
+    processMessage(state.lastUserMsg, true);
   };
 
   const sendFeedback = async (id, type, comment, btn) => {

@@ -255,6 +255,9 @@ class AIManager:
         
         models = self.openrouter_models if provider == "openrouter" else self.gemini_models
         
+        last_valid_response = None
+        last_valid_provider = None
+        
         for model_name in models:
             print(f"[AIManager] Intentando {provider.upper()}: {model_name}")
             
@@ -272,21 +275,30 @@ class AIManager:
                 # Si hubo error 429, el cooldown ya se seteó adentro de _call_gemini (necesitamos pasar self)
                 pass
                 
+                
             if response:
+                # Guardamos esta respuesta como "posible fallback" por si las siguientes fallan
+                last_valid_response = response
+                last_valid_provider = model_name
+                
                 if self._is_useful_response(response, query_type):
                     print(f"[AIManager] EXITO: {model_name} genero respuesta util ({len(response)} chars)")
                     return response
                 else:
                     print(f"[AIManager] {model_name} genero respuesta NO util. Probando siguiente...")
             else:
+                # Si falló (None), no tenemos nada que guardar
                 print(f"[AIManager] {model_name} fallo. Probando siguiente...")
-                
-        # Si ninguno fue útil, devolver la última respuesta obtenida (si hubo)
-        # Esto evita "Dificultades técnicas" cuando simplemente no hay info
-        if response:
-            print("[AIManager] Fallback: Devolviendo ultima respuesta no-util")
-            return response
+        
+        # FINAL FALLBACK LOGIC
+        # Si encontramos una respuesta útil, ya se retornó arriba.
+        # Si llegamos aquí, ninguna fue "útil" según _is_useful_response.
+        # PERO, si alguna generó texto (last_valid_response), devolvemos esa en lugar de None.
+        if last_valid_response:
+            print(f"[AIManager] Fallback Final: Devolviendo la mejor respuesta disponible de {last_valid_provider} ({len(last_valid_response)} chars)")
+            return last_valid_response
             
+        print("[AIManager] CRÍTICO: Ningún modelo generó respuesta válida.")
         return None
 
     def _build_prompt(self, user_message: str, pdf_context: str, web_context: str, history: list) -> str:
