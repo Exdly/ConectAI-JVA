@@ -48,7 +48,7 @@ from google_drive import (
     exchange_code_for_tokens,
     is_authenticated
 )
-from google_sheets import get_sheets_manager
+from storage_manager import get_sheets_manager
 from ai_manager import get_ai_manager
 from web_scraper import get_web_scraper
 
