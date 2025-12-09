@@ -71,8 +71,34 @@ def exchange_code_for_tokens(authorization_code: str) -> dict:
     return tokens
 
 def get_credentials() -> Optional[Credentials]:
-    """Obtiene las credenciales de Google, refrescándolas si es necesario."""
+    """Obtiene las credenciales de Google, refrescándolas si es necesario.
+    
+    Prioridad:
+    1. Variable de entorno GOOGLE_REFRESH_TOKEN (para Vercel)
+    2. Archivo TOKEN_FILE (para desarrollo local)
+    """
+    # Opción 1: Usar GOOGLE_REFRESH_TOKEN de variables de entorno (Vercel)
+    refresh_token_env = os.getenv('GOOGLE_REFRESH_TOKEN')
+    if refresh_token_env:
+        try:
+            creds = Credentials(
+                token=None,  # Se obtendrá al refrescar
+                refresh_token=refresh_token_env,
+                token_uri='https://oauth2.googleapis.com/token',
+                client_id=GOOGLE_CLIENT_ID,
+                client_secret=GOOGLE_CLIENT_SECRET,
+                scopes=SCOPES
+            )
+            # Refrescar para obtener access_token válido
+            creds.refresh(Request())
+            print("[Google Drive] Credenciales obtenidas desde GOOGLE_REFRESH_TOKEN (env)")
+            return creds
+        except Exception as e:
+            print(f"[Google Drive] Error usando GOOGLE_REFRESH_TOKEN: {e}")
+    
+    # Opción 2: Usar TOKEN_FILE (desarrollo local)
     if not os.path.exists(TOKEN_FILE):
+        print("[Google Drive] No se encontró TOKEN_FILE ni GOOGLE_REFRESH_TOKEN")
         return None
     
     try:
@@ -93,7 +119,9 @@ def get_credentials() -> Optional[Credentials]:
             token_data['access_token'] = creds.token
             with open(TOKEN_FILE, 'w') as f:
                 json.dump(token_data, f)
-            print("[Google Drive] Token refrescado")
+            print("[Google Drive] Token refrescado desde TOKEN_FILE")
+        else:
+            print("[Google Drive] Credenciales obtenidas desde TOKEN_FILE")
         
         return creds
         
