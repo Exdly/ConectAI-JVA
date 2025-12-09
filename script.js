@@ -6,7 +6,7 @@ document.addEventListener("DOMContentLoaded", () => {
     children.flat().forEach(c => c && el.append(c)); return el;
   };
 
-  const state = { isMinimized: false, isHidden: false, unread: 0, isProcessing: false, history: [], auth: false, abortCtrl: null, lastUserMsg: "" };
+  const state = { isMinimized: false, isHidden: false, unread: 0, isProcessing: false, history: [], auth: false, abortCtrl: null, lastUserMsg: "", lastBotRowNum: 0 };
   const CFG = { BACKEND: "http://127.0.0.1:5000", MIN_W: 300, MIN_H: 400, MAX_W: 800, MAX_H: 700 };
   const els = { container: $("chatbotContainer"), header: $("chatbotHeader"), msgs: $("chatbotMessages"), input: $("chatbotInput"), sendBtn: $("chatbotSend"), badge: $("newMessageBadge"), notif: $("notification") };
 
@@ -85,7 +85,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const btns = [
         { cls: "like-btn", icon: "thumbs-up", title: "Útil", click: (e) => handleFeedback(id, true, e.currentTarget) },
         { cls: "dislike-btn", icon: "thumbs-down", title: "No útil", click: (e) => handleFeedback(id, false, e.currentTarget) },
-        { cls: "regenerate-btn", icon: "redo", title: "Regenerar", click: () => processMessage(state.lastUserMsg) }
+        { cls: "regenerate-btn", icon: "redo", title: "Regenerar", click: () => handleRegenerate(id) }
       ];
       msgDiv.append(h("div", { className: "message-actions" }, ...btns.map(b => h("button", { className: `action-btn ${b.cls}`, title: b.title, onclick: b.click, innerHTML: `<i class="fas fa-${b.icon}"></i>` }))));
     } else if (isUser) {
@@ -103,12 +103,12 @@ document.addEventListener("DOMContentLoaded", () => {
     bubble.append(h("div", { style: { marginTop: "10px" } }, h("a", { href: url, target: "_blank", textContent: linkTxt, style: { color: "#1c2682", fontWeight: "bold", textDecoration: "underline" } })));
   };
 
-  const processMessage = async (msg) => {
+  const processMessage = async (msg, regenRowNum = 0) => {
     if (state.isProcessing) return;
     state.isProcessing = true;
-    const isEdit = !!els.input.dataset.editId, editId = els.input.dataset.editId, rowNum = parseInt(els.input.dataset.editRow || 0);
+    const isEdit = !!els.input.dataset.editId, editId = els.input.dataset.editId, rowNum = parseInt(els.input.dataset.editRow || regenRowNum || 0);
     delete els.input.dataset.editId; delete els.input.dataset.editRow;
-    const currentMsgId = isEdit ? renderMessage(msg, true, editId, rowNum) : renderMessage(msg, true);
+    const currentMsgId = isEdit ? renderMessage(msg, true, editId, rowNum) : (regenRowNum > 0 ? null : renderMessage(msg, true));
     
     showTyping(); updateSendBtn(true);
     try {
@@ -160,6 +160,17 @@ document.addEventListener("DOMContentLoaded", () => {
       const comment = !isLike ? prompt("¿Por qué no fue útil? (Opcional)") || "" : "";
       await sendFeedback(id, type, comment, btn);
     }
+  };
+
+  const handleRegenerate = (botMsgId) => {
+    // Obtener el row_number del mensaje del bot antes de eliminarlo
+    const msgDiv = els.msgs.querySelector(`.message[data-id="${botMsgId}"]`);
+    const rowNum = msgDiv ? parseInt(msgDiv.dataset.rowNumber || 0) : 0;
+    // Eliminar del DOM y del historial
+    if (msgDiv) msgDiv.remove();
+    state.history = state.history.filter(h => h.id !== botMsgId);
+    // Procesar como regeneración pasando el rowNum existente
+    processMessage(state.lastUserMsg, rowNum);
   };
 
   const sendFeedback = async (id, type, comment, btn) => {

@@ -103,10 +103,10 @@ document.addEventListener("DOMContentLoaded", () => {
     bubble.append(h("div", { style: { marginTop: "10px" } }, h("a", { href: url, target: "_blank", textContent: linkTxt, style: { color: "#1c2682", fontWeight: "bold", textDecoration: "underline" } })));
   };
 
-  const processMessage = async (msg, isRegen = false) => {
+  const processMessage = async (msg, isRegen = false, regenRowNum = 0) => {
     if (state.isProcessing) return;
     state.isProcessing = true;
-    const isEdit = !!els.input.dataset.editId, editId = els.input.dataset.editId, rowNum = parseInt(els.input.dataset.editRow || 0);
+    const isEdit = !!els.input.dataset.editId, editId = els.input.dataset.editId, rowNum = parseInt(els.input.dataset.editRow || regenRowNum || 0);
     delete els.input.dataset.editId; delete els.input.dataset.editRow;
     
     // Si es EDIT: Buscar el mensaje original y su respuesta, y eliminarlos AHORA
@@ -191,16 +191,20 @@ document.addEventListener("DOMContentLoaded", () => {
   const handleRegenerate = () => {
     // 1. Encontrar el último mensaje del asistente
     const lastIdx = state.history.findLastIndex(h => h.role === "assistant");
+    let rowNum = 0;
     if (lastIdx !== -1) {
       const msgId = state.history[lastIdx].id;
-      // 2. Eliminar del DOM
+      // 2. Obtener el row_number del DOM antes de eliminarlo
       const msgDiv = els.msgs.querySelector(`.message[data-id="${msgId}"]`);
-      if (msgDiv) msgDiv.remove();
+      if (msgDiv) {
+        rowNum = parseInt(msgDiv.dataset.rowNumber || 0);
+        msgDiv.remove();
+      }
       // 3. Eliminar del historial
       state.history.splice(lastIdx, 1);
     }
-    // 4. Procesar como regeneración (sin repintar usuario)
-    processMessage(state.lastUserMsg, true);
+    // 4. Procesar como regeneración (sin repintar usuario) pasando el rowNum existente
+    processMessage(state.lastUserMsg, true, rowNum);
   };
 
   const sendFeedback = async (id, type, comment, btn) => {
