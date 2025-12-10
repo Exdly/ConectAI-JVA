@@ -1,4 +1,4 @@
-/* IESTP JVA - CSS Optimizado (250 líneas max) */
+/* IESTP JVA - CSS Optimizado */
 :root {
   --p: #1c2682;
   --s: #283593;
@@ -27,8 +27,6 @@ body {
   min-height: 100vh;
   min-height: 100dvh;
 }
-
-/* Layout */
 .main-container {
   display: grid;
   grid-template: "header"/1fr;
@@ -61,8 +59,6 @@ body {
   font-size: 1rem;
   text-align: center;
 }
-
-/* Chatbot - Clave: z-index alto y max-width para viewport pequeño */
 .chatbot-container {
   position: fixed;
   bottom: 20px;
@@ -106,8 +102,6 @@ body {
   transform: scale(0.8);
   pointer-events: none;
 }
-
-/* Header */
 .chatbot-header {
   grid-area: header;
   background: var(--gp);
@@ -167,8 +161,6 @@ body {
 .chatbot-controls button:hover {
   transform: scale(1.2);
 }
-
-/* Content */
 .chatbot-content {
   grid-area: content;
   display: grid;
@@ -183,8 +175,6 @@ body {
   flex-direction: column;
   gap: 0.9rem;
 }
-
-/* Messages */
 .message {
   position: relative;
   max-width: 85%;
@@ -263,8 +253,6 @@ body {
 .dislike-btn:hover {
   color: var(--err);
 }
-
-/* Input & Suggestions */
 .chatbot-suggestions {
   grid-area: suggestions;
   display: flex;
@@ -325,8 +313,6 @@ body {
 .chatbot-send.stop {
   background: var(--err);
 }
-
-/* Resizers - Solo desktop */
 .chatbot-resizer {
   position: absolute;
   z-index: 10;
@@ -395,8 +381,6 @@ body {
   bottom: -5px;
   cursor: s-resize;
 }
-
-/* Utils */
 .typing-indicator {
   display: flex;
   gap: 4px;
@@ -461,8 +445,6 @@ body {
 .notification.error i {
   color: var(--err);
 }
-
-/* Animations */
 @keyframes pulse {
   0%,
   100% {
@@ -501,8 +483,6 @@ body {
     transform: scale(1.1);
   }
 }
-
-/* Responsive - Tablet */
 @media (max-width: 1024px) {
   .chatbot-container {
     width: 340px;
@@ -515,8 +495,6 @@ body {
     font-size: 1.8rem;
   }
 }
-
-/* Responsive - Mobile Portrait */
 @media (max-width: 768px) {
   .header-section {
     min-height: 28vh;
@@ -542,8 +520,6 @@ body {
     left: auto;
   }
 }
-
-/* Responsive - Small Mobile */
 @media (max-width: 576px) {
   .header-section {
     min-height: 22vh;
@@ -572,8 +548,6 @@ body {
     right: 15px;
   }
 }
-
-/* Responsive - Landscape (Tablets y Móviles) - CORREGIDO */
 @media (max-width: 1024px) and(orientation:landscape) {
   .main-container {
     padding-right: 50%;
@@ -618,8 +592,6 @@ body {
     height: 50px;
   }
 }
-
-/* Responsive - Very Small Landscape */
 @media (max-width: 767px) and(orientation:landscape) {
   .main-container {
     padding-right: 48%;
@@ -633,8 +605,6 @@ body {
     right: 2%;
   }
 }
-
-/* Responsive - Minimal */
 @media (max-width: 360px) {
   .logo-img {
     max-width: 85px;
