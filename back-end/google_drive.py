@@ -23,6 +23,7 @@ from config import (
     TOKEN_FILE,
     GOOGLE_DRIVE_FOLDER_ID,
     CACHE_FOLDER,
+    STATIC_CACHE_FOLDER,
     CACHE_REFRESH_INTERVAL
 )
 
@@ -158,18 +159,36 @@ class GoogleDriveManager:
             os.makedirs(CACHE_FOLDER)
     
     def _load_cache_from_disk(self):
-        """Carga el cache de PDFs desde disco."""
-        cache_file = os.path.join(CACHE_FOLDER, "pdf_cache.json")
-        if os.path.exists(cache_file):
+        """Carga el cache de PDFs desde disco.
+        
+        Prioridad:
+        1. STATIC_CACHE_FOLDER (cache desplegado con el código - Vercel)
+        2. CACHE_FOLDER (cache dinámico - /tmp en Vercel o cache local)
+        """
+        # Intentar primero el caché estático (desplegado con el código)
+        static_cache_file = os.path.join(STATIC_CACHE_FOLDER, "pdf_cache.json")
+        dynamic_cache_file = os.path.join(CACHE_FOLDER, "pdf_cache.json")
+        
+        cache_file = None
+        if os.path.exists(static_cache_file):
+            cache_file = static_cache_file
+            print(f"[Google Drive] Usando cache estático: {static_cache_file}")
+        elif os.path.exists(dynamic_cache_file):
+            cache_file = dynamic_cache_file
+            print(f"[Google Drive] Usando cache dinámico: {dynamic_cache_file}")
+        
+        if cache_file:
             try:
                 with open(cache_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                     self.pdf_cache = data.get('pdfs', {})
                     self.all_documents_text = data.get('all_text', '')
                     self.all_documents_cached_at = data.get('all_cached_at', 0)
-                print(f"[Google Drive] Cache cargado: {len(self.pdf_cache)} PDFs")
+                print(f"[Google Drive] Cache cargado: {len(self.pdf_cache)} PDFs, texto: {len(self.all_documents_text)} chars")
             except Exception as e:
                 print(f"[Google Drive] Error cargando cache: {e}")
+        else:
+            print("[Google Drive] No se encontró archivo de cache")
     
     def _save_cache_to_disk(self):
         """Guarda el cache de PDFs en disco."""
