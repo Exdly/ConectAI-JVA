@@ -74,7 +74,7 @@ body {
   box-shadow: 0 8px 32px rgba(31, 38, 135, 0.2);
   display: grid;
   grid-template: "header" auto "content" 1fr;
-  z-index: 9999;
+  z-index: 2147483646; /* Máximo z-index para estar sobre DevTools */
   transition: 0.3s;
 }
 .chatbot-container.resizing,
@@ -431,7 +431,7 @@ body {
   gap: 8px;
   transform: translateX(120%);
   transition: 0.3s;
-  z-index: 10000;
+  z-index: 2147483647; /* Sobre chatbot para notificaciones */
 }
 .notification.show {
   transform: translateX(0);

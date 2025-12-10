@@ -41,7 +41,7 @@ def sanitize_input(text):
     
     return sanitized.strip()
 
-from config import SERVER_PORT, DEBUG_MODE, ALLOWED_ORIGINS
+from config import SERVER_PORT, DEBUG_MODE, ALLOWED_ORIGINS, IS_VERCEL
 from google_drive import (
     get_drive_manager, 
     get_authorization_url, 
@@ -51,6 +51,7 @@ from google_drive import (
 from storage_manager import get_sheets_manager
 from ai_manager import get_ai_manager
 from web_scraper import get_web_scraper
+from smart_response import get_smart_response  # Reactivado con FAQ corregidas
 
 # Configuración explícita de rutas para Vercel y Local
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -81,7 +82,8 @@ def log_request():
     """Loguea cada petición entrante para diagnóstico."""
     import sys
     if request.endpoint not in ['static', None]:  # No loguear archivos estáticos
-        print(f"\n[FLASK] >>> Peticion recibida: {request.method} {request.path}", flush=True)
+        if "/api/auth/status" not in request.path: # Ignorar spam de status
+            print(f"\n[FLASK] >>> Peticion recibida: {request.method} {request.path}", flush=True)
         sys.stdout.flush()
 
 # =============================================================================
@@ -268,15 +270,20 @@ def chat():
         web_context = web_scraper.get_all_website_content()
         print(f"[API] Contexto web obtenido: {len(web_context) if web_context else 0} caracteres")
         
-        # Generar respuesta con IA (fallback automático OpenRouter → Gemini)
-        print("[API] Llamando a AI Manager para generar respuesta...")
-        response = ai_manager.generate_response(
+        # Sistema Inteligente: FAQ (correctas) → Búsqueda (estricta) → IA (gemma-27b)
+        print("[API] Llamando a Smart Response System (FAQ corregidas)...")
+        response, source = get_smart_response(
             user_message=user_message,
             pdf_context=pdf_context,
             web_context=web_context,
-            conversation_history=conversation_history
+            ai_fallback_func=lambda: ai_manager.generate_response(
+                user_message=user_message,
+                pdf_context=pdf_context,
+                web_context=web_context,
+                conversation_history=conversation_history
+            )
         )
-        print(f"[API] Respuesta generada: {'SI' if response else 'NO'} ({len(response) if response else 0} chars)")
+        print(f"[API] Respuesta obtenida desde: {source.upper()} ({len(response) if response else 0} chars)")
         
         row_number = 0
         
@@ -503,42 +510,60 @@ if __name__ == '__main__':
     print("=" * 60)
     print(f"\n[Servidor] Iniciando en http://localhost:{SERVER_PORT}")
     
-    if is_authenticated():
-        print("[Inicializando] Ya autenticado con Google")
-        try:
-            print("[Inicializando] Conectando con Google Drive...")
-            drive_mgr = get_drive_manager()
-            
-            print("[Inicializando] Conectando con Google Sheets...")
-            get_sheets_manager()
-            
-            print("[Inicializando] Configurando AI Manager...")
-            get_ai_manager()
-            
-            print("[Inicializando] Configurando Web Scraper...")
-            print("[Inicializando] Configurando Web Scraper...")
-            scraper = get_web_scraper()
-            # Force scrape/update cache on startup
-            print("[Inicializando] Verificando/Actualizando contenido web...")
-            scraper.get_all_website_content()
-            
-            # Precargar documentos en segundo plano
-            print("[Inicializando] Precargando documentos PDF...")
-            drive_mgr.get_all_documents_text()
-            
-            print("\n[Servidor] Todas las conexiones establecidas")
-        except Exception as e:
-            print(f"\n[ADVERTENCIA] Error al inicializar: {e}")
-    else:
-        print("[Inicializando] No autenticado con Google")
-        print(f"[Inicializando] Visita: http://localhost:{SERVER_PORT}/api/auth/url")
     
+    # Lógica para evitar doble iniciación con el reloader de Flask
+    # WERKZEUG_RUN_MAIN se establece en 'true' en el proceso hijo (reloader)
+    is_reloader = os.environ.get("WERKZEUG_RUN_MAIN") == "true"
+    
+    # En producción (Vercel) no hay reloader, así que siempre inicializamos.
+    # En local (DEBUG_MODE), solo inicializamos en el proceso hijo (reloader) para ver logs una sola vez.
+    should_init = is_reloader or IS_VERCEL
+    
+    if should_init:
+        if is_authenticated():
+            print("[Inicializando] Ya autenticado con Google")
+            try:
+                print("[Inicializando] Conectando con Google Drive...")
+                drive_mgr = get_drive_manager()
+                
+                print("[Inicializando] Conectando con Google Sheets...")
+                get_sheets_manager()
+                
+                print("[Inicializando] Configurando AI Manager...")
+                get_ai_manager()
+                
+                print("[Inicializando] Configurando Web Scraper...")
+                scraper = get_web_scraper()
+                
+                # Cargar cache pero no forzar scrape en cada reinicio para ser más veloz
+                # Solo si el cache está vacío se hará scrape
+                if not scraper.cache: 
+                    print("[Inicializando] Cache vacío, cargando contenido web...")
+                    scraper.get_all_website_content()
+                else:
+                    print(f"[Inicializando] Web Scraper listo con {len(scraper.cache)} páginas en cache")
+                
+                # Precargar documentos solo si es necesario
+                print("[Inicializando] Verificando documentos PDF...")
+                drive_mgr.get_all_documents_text()
+                
+                print("\n[Servidor] Todas las conexiones establecidas")
+            except Exception as e:
+                print(f"\n[ADVERTENCIA] Error al inicializar: {e}")
+        else:
+            print("[Inicializando] No autenticado con Google")
+            print(f"[Inicializando] Visita: http://localhost:{SERVER_PORT}/api/auth/url")
+    else:
+        print("[Servidor] Proceso padre iniciado (esperando reloader)...")
+
     print("[Servidor] Listo para recibir conexiones\n")
     
     # En producción (Vercel), no necesitamos app.run()
     # Pero para local, lo mantenemos.
     # La variable IS_VERCEL viene de config.py
-    from config import IS_VERCEL
+    # En producción (Vercel), no necesitamos app.run()
+    # Pero para local, lo mantenemos.
+    # La variable IS_VERCEL viene de config.py
     if not IS_VERCEL:
         app.run(
             host='0.0.0.0',

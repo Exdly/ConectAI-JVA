@@ -101,29 +101,21 @@ ALLOWED_ORIGINS = [
 # CONFIGURACIÓN DEL MODELO DE IA
 # =============================================================================
 
-# Configuración de Modelos IA
-# OpenRouter (Modelos Gratuitos disponibles - Dic 2024)
-# Basado en capturas de OpenRouter del usuario
+# OpenRouter (Modelos gratuitos - 50 RPD total como fallback)
 OPENROUTER_MODELS = [
-    "google/gemma-3-27b-it:free",             # Gemma 3 27B - Buen contexto
-    "meta-llama/llama-3.2-3b-instruct:free",  # Llama 3.2 3B - Ligero y rápido
-    "qwen/qwen3-4b:free",                     # Qwen3 4B - Buen modelo pequeño
-    "mistralai/mistral-small-3.1-24b-instruct:free", # Mistral Small 3.1 24B
+    "google/gemma-3-27b-it:free",             # Gemma 3 27B - Mejor calidad
+    "meta-llama/llama-3.2-3b-instruct:free",  # Llama 3.2 3B - Rápido
+    "mistralai/mistral-7b-instruct:free",     # Mistral 7B - Bueno
 ]
 
-# Google Gemini (Modelos disponibles según tu cuenta - Dic 2024)
-# Usar nombres exactos que aparecen en Google AI Studio
-# Basado en capturas del panel de usuario:
-# - gemini-2.5-flash-lite: 10 RPM, 250K TPM, 20 RPD (MEJOR CUOTA)
-# - gemini-2.5-flash: 5 RPM, 250K TPM, 20 RPD
-# - gemini-2.0-flash/lite: 0/limitado (NO USAR)
+# Google Gemini API - Usando modelos Gemma 3 con LÍMITES ALTOS
+# Gemma 3 tiene 14,400 RPD (Requests Per Day) vs 20 RPD de Gemini regular
+# ¡Esto soporta 300+ usuarios al día con múltiples consultas!
 GEMINI_MODELS = [
-    "gemini-2.5-flash-lite",  # PRIMERO: Mejor cuota (10 RPM)
-    "gemini-2.5-flash",       # SEGUNDO: Buena cuota (5 RPM)
-    "gemini-2.0-flash-lite",  # TERCERO: Muy rápido y económico
-    "gemini-2.0-flash",       # CUARTO: Estable
-    "gemini-1.5-flash",       # FALLBACK: Alto límite diario (1500 RPD)
-    "gemini-1.5-pro",         # Mayor razonamiento (lento)
+    "gemma-3-27b-it",         # PRIMERO: 14,400 RPD - Mejor calidad (27B parámetros)
+    "gemma-3-12b-it",         # SEGUNDO: 14,400 RPD - Balance calidad/velocidad (12B parámetros)
+    "gemma-3-4b-it",         # TERCERO: 14,400 RPD - Más rápido (4B parámetros)
+    "gemini-2.5-flash",       # FALLBACK: 20 RPD - Solo si Gemma falla
 ]
 
 # Configuración General IA
@@ -133,6 +125,11 @@ MODEL_TEMPERATURE = 0.7
 # Rate Limiting (Ajustado para evitar 429)
 GEMINI_MIN_INTERVAL = 10  # Segundos entre llamadas (reducido gracias a rotación)
 GEMINI_COOLDOWN = 60      # Segundos de espera tras error (reducido)
+
+# Límites de Contexto (CRÍTICO PARA EVITAR 429)
+# Free Tier ~15000 tokens/min. Si enviamos 70k chars (~17k tokens), fallará siempre.
+AI_MAX_PDF_CONTEXT = 20000  # Reducido de ~40k a 20k chars
+AI_MAX_WEB_CONTEXT = 10000  # Reducido de ~30k a 10k chars
 
 # =============================================================================
 # CONFIGURACIÓN DE ARCHIVOS Y CACHE (HÍBRIDO: LOCAL + VERCEL)
@@ -151,7 +148,8 @@ else:
     # En local, usar rutas relativas al archivo actual
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     TOKEN_FILE = os.path.join(BASE_DIR, "token.json")
-    CACHE_FOLDER = os.path.join(BASE_DIR, "cache")  # Renombrado de cache_pdfs
+    # Usar .cache_data (oculto) para evitar bucles de reinicio de Flask en local
+    CACHE_FOLDER = os.path.join(BASE_DIR, ".cache_data")
     # URL de redirección local
     OAUTH_REDIRECT_URI = "http://localhost:5000/oauth2callback"
     DEBUG_MODE = True

@@ -184,11 +184,68 @@ class WebScraper:
             try:
                 content = self.get_page_content(url, force_refresh)
                 if content:
+                    # ENRIQUECIMIENTO DE CONTEXTO (Deep Fix para Docentes)
+                    # Inyectamos el contexto de la sección en cada línea para que RAG no pierda la referencia
+                    content = self._enrich_content_with_context(content, url)
                     all_content.append(f"\n{'='*50}\nPÁGINA WEB: {url}\n{'='*50}\n{content}")
             except Exception as e:
                 print(f"[WebScraper] Error procesando {url}: {e}")
         
         return '\n\n'.join(all_content)
+
+    def _enrich_content_with_context(self, content: str, url: str) -> str:
+        """
+        Enriquece el contenido con contexto explícito para mejorar RAG.
+        Específicamente para la página de 'planaDocente' donde se mezclan carreras.
+        """
+        if "planaDocente" not in url:
+            return content
+            
+        lines = content.split('\n')
+        enriched_lines = []
+        current_section = "INFORMACIÓN GENERAL"
+        
+        # Headers conocidos en la página de Plana Docente (basado en análisis de cache)
+        known_sections = [
+            "ARQUITECTURA DE PLATAFORMAS Y SERVICIOS TI",
+            "CONTABILIDAD",
+            "ENFERMERÍA TÉCNICA",
+            "MECATRÓNICA AUTOMOTRIZ",
+            "TÉCNICA EN FARMACIA",
+            "DOCENTES DE EMPLEABILIDAD"
+        ]
+        
+        found_any_section = False
+        
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:
+                enriched_lines.append(line)
+                continue
+                
+            # Normalizar para detección
+            upper_line = stripped.upper()
+            
+            # Detectar cambio de sección
+            is_header = False
+            for sec in known_sections:
+                if sec in upper_line:
+                    current_section = sec
+                    is_header = True
+                    found_any_section = True
+                    break
+            
+            if is_header:
+                # Marcamos fuertemente el header
+                enriched_lines.append(f"\n=== SECCIÓN: {current_section} ===\n{line}")
+            elif found_any_section and len(stripped) > 3 and "Ver CV" not in stripped and "IESTP" not in stripped:
+                # Inyectamos el contexto en líneas de contenido (nombres de docentes)
+                # Formato: [Carrera] Nombre
+                enriched_lines.append(f"[{current_section}] {line}")
+            else:
+                enriched_lines.append(line)
+                
+        return '\n'.join(enriched_lines)
     
     def search_in_website(self, query: str) -> str:
         """Busca información relevante en el contenido del sitio web."""
@@ -197,8 +254,10 @@ class WebScraper:
         
         for url in INSTITUTO_WEB_PAGES:
             content = self.get_page_content(url)
-            if content and query_lower in content.lower():
-                relevant_content.append(f"--- {url} ---\n{content[:5000]}")
+            if content:
+                content = self._enrich_content_with_context(content, url)
+                if query_lower in content.lower():
+                    relevant_content.append(f"--- {url} ---\n{content[:5000]}")
         
         return '\n\n'.join(relevant_content) if relevant_content else ""
 
