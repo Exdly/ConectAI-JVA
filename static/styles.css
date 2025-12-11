@@ -857,6 +857,9 @@ body {
   .close-sidebar-btn {
     display: block;
   }
+  #sidebarToggleBtn {
+    display: none;
+  }
   .suggestions-grid {
     grid-template-columns: 1fr;
   }
