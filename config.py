@@ -1,41 +1,3 @@
-"""
-Configuración del Backend - IESTP Juan Velasco Alvarado
-========================================================
-INSTRUCCIONES DE CONFIGURACIÓN:
-
-1. OPENROUTER_API_KEY:
-   - Ve a https://openrouter.ai/
-   - Crea una cuenta o inicia sesión
-   - Ve a "Keys" y genera una nueva API Key
-   - Copia la key y pégala en OPENROUTER_API_KEY
-
-2. GEMINI_API_KEY (GRATIS - 15 req/min, 1500/día):
-   - Ve a https://makersuite.google.com/app/apikey
-   - Click "Create API Key" y selecciona tu proyecto
-   - Copia la key y pégala en GEMINI_API_KEY
-   - ¡Es completamente GRATIS!
-
-3. GOOGLE_DRIVE_FOLDER_ID:
-   - Abre tu carpeta TRAMITES_JVA en Google Drive
-   - Copia el ID de la URL: https://drive.google.com/drive/folders/[ESTE_ES_EL_ID]
-   - Pégalo en GOOGLE_DRIVE_FOLDER_ID
-
-4. GOOGLE_SHEET_ID:
-   - Crea un nuevo Google Sheet para registrar consultas
-   - Copia el ID de la URL: https://docs.google.com/spreadsheets/d/[ESTE_ES_EL_ID]/edit
-   - Pégalo en GOOGLE_SHEET_ID
-
-5. CREDENCIALES DE GOOGLE (Aplicación Web):
-   - Ve a https://console.cloud.google.com/
-   - En "Credenciales" > "ID de cliente OAuth 2.0" (Aplicación Web)
-   - Copia el "ID de cliente" y pégalo en GOOGLE_CLIENT_ID
-   - Copia el "Secreto del cliente" y pégalo en GOOGLE_CLIENT_SECRET
-   - Asegúrate de agregar las URIs de redirección autorizadas:
-     * http://127.0.0.1:5500/
-     * http://localhost:5000/oauth2callback
-     * Tu dominio de producción
-"""
-
 import os
 from dotenv import load_dotenv
 
@@ -147,15 +109,16 @@ if IS_VERCEL:
 else:
     # En local, usar rutas relativas al archivo actual
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    TOKEN_FILE = os.path.join(BASE_DIR, "token.json")
-    # Usar .cache_data (oculto) para evitar bucles de reinicio de Flask en local
-    CACHE_FOLDER = os.path.join(BASE_DIR, ".cache_data")
+    # Carpeta unificada de CACHE (contendrá token.json y archivos de cache)
+    CACHE_FOLDER = os.path.join(BASE_DIR, "cache")
+    TOKEN_FILE = os.path.join(CACHE_FOLDER, "token.json")
+    
     # URL de redirección local
     OAUTH_REDIRECT_URI = "http://localhost:5000/oauth2callback"
     DEBUG_MODE = True
 
 # Carpeta de cache estático (siempre relativa al código, NO a /tmp/)
-# Esto permite que Vercel lea el archivo desplegado
+# En este nuevo esquema unificado, STATIC_CACHE_FOLDER es lo mismo que CACHE_FOLDER en local
 STATIC_CACHE_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache")
 
 CACHE_REFRESH_INTERVAL = 1800

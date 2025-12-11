@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="es-PE">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="referrer" content="origin" />
+    <title>Asistente Virtual - IESTP Juan Velasco Alvarado</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Roboto:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Font Awesome -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+
+    <!-- Markdown Parser -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <!-- Google Identity Services -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="app-container">
+      <!-- Sidebar (Historial y Menú) -->
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <button class="new-chat-btn" id="newChatBtn">
+            <i class="fas fa-plus"></i> Nuevo chat
+          </button>
+          <button
+            class="theme-toggle-btn"
+            id="themeToggleBtn"
+            title="Cambiar tema"
+          >
+            <i class="fas fa-moon"></i>
+          </button>
+          <button class="close-sidebar-btn" id="closeSidebarBtn">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+
+        <div class="history-container">
+          <div class="history-section-title">Recientes</div>
+          <div class="history-list" id="historyList">
+            <!-- Los items del historial se inyectarán aquí -->
+            <div class="history-placeholder">
+              <i class="fas fa-history"></i>
+              <p>Inicia sesión para ver tu historial</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="sidebar-footer">
+          <div class="user-profile" id="userProfile" style="display: none">
+            <img
+              src=""
+              alt="User"
+              id="userAvatar"
+              class="user-avatar"
+              referrerpolicy="no-referrer"
+            />
+            <div class="user-info">
+              <span class="user-name" id="userName">Usuario</span>
+              <button class="logout-btn" id="logoutBtn">Cerrar sesión</button>
+            </div>
+          </div>
+          <div id="googleSignInBtn"></div>
+        </div>
+      </aside>
+
+      <!-- Área Principal de Chat -->
+      <main class="main-content">
+        <!-- Header (Toggle Móvil y Branding) -->
+        <header class="top-bar">
+          <button class="menu-toggle" id="menuToggle">
+            <i class="fas fa-bars"></i>
+          </button>
+          <button id="sidebarToggleBtn" title="Ocultar/Mostrar Historial" style="margin-right: 10px; background:none; border:none; cursor:pointer; font-size: 1.1rem; color: var(--text-secondary);">
+            <i class="fas fa-columns"></i>
+          </button>
+          <div class="brand-info">
+            <div class="brand-logo-container">
+              <i class="fas fa-robot"></i>
+            </div>
+            <span class="brand-name">ConectAI-JVA</span>
+          </div>
+          <div class="top-actions">
+            <!-- Espacio para futuros controles -->
+          </div>
+        </header>
+
+        <!-- Mensajes del Chat -->
+        <div class="chat-scroll-area" id="chatScrollArea">
+          <div class="welcome-screen" id="welcomeScreen">
+            <div class="welcome-logo-container">
+              <img
+                src="https://iestpjva.edu.pe/static/media/logo.70cc32da144c676d4f74.png"
+                alt="Logo JVA"
+                class="welcome-logo-img"
+              />
+            </div>
+            <h1>¿En qué puedo ayudarte hoy?</h1>
+            <p class="welcome-subtitle">
+              Asistente Virtual del IESTP Juan Velasco Alvarado
+            </p>
+
+            <div class="suggestions-grid">
+              <button
+                class="suggestion-card"
+                data-query="¿Cuándo es el examen de admisión?"
+              >
+                <i class="fas fa-calendar-alt"></i>
+                <span>Examen de admisión</span>
+              </button>
+              <button
+                class="suggestion-card"
+                data-query="¿Cuáles son los requisitos de matrícula?"
+              >
+                <i class="fas fa-file-alt"></i>
+                <span>Requisitos de matrícula</span>
+              </button>
+              <button
+                class="suggestion-card"
+                data-query="¿Qué carreras ofrecen?"
+              >
+                <i class="fas fa-graduation-cap"></i>
+                <span>Carreras profesionales</span>
+              </button>
+              <button
+                class="suggestion-card"
+                data-query="¿Cómo llego al instituto?"
+              >
+                <i class="fas fa-map-marker-alt"></i>
+                <span>Ubicación</span>
+              </button>
+            </div>
+          </div>
+
+          <div
+            class="messages-container"
+            id="messagesContainer"
+            style="display: none"
+          >
+            <!-- Los mensajes se inyectarán aquí -->
+          </div>
+
+          <div
+            class="typing-indicator-container"
+            id="typingIndicator"
+            style="display: none"
+          >
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+          </div>
+        </div>
+
+        <!-- Área de Input -->
+        <div class="input-area-wrapper">
+          <div class="input-container">
+            <textarea
+              id="chatInput"
+              placeholder="Envía un mensaje a ConectAI..."
+              rows="1"
+            ></textarea>
+            <button class="send-btn" id="sendBtn" disabled>
+              <i class="fas fa-paper-plane"></i>
+            </button>
+          </div>
+          <div class="disclaimer">
+            ConectAI puede cometer errores. Considera verificar la información
+            importante.
+          </div>
+        </div>
+      </main>
+
+      <!-- Overlay para sidebar móvil -->
+      <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    </div>
+
+    <!-- Toast de Notificación -->
+    <div class="toast" id="toast">
+      <i class="fas fa-info-circle" id="toastIcon"></i>
+      <span id="toastMessage">Notificación</span>
+    </div>
+
+    <!-- Modal de Feedback (Dislike) -->
+    <div class="modal-overlay" id="feedbackModal" style="display: none">
+      <div class="modal-content">
+        <h3>¿Por qué no fue útil esta respuesta?</h3>
+        <textarea
+          id="feedbackReason"
+          placeholder="Por favor, cuéntanos más para mejorar..."
+        ></textarea>
+        <div class="modal-actions">
+          <button class="modal-btn cancel" id="cancelFeedbackBtn">
+            Cancelar
+          </button>
+          <button class="modal-btn confirm" id="submitFeedbackBtn">
+            Enviar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Eliminar -->
+    <div class="modal-overlay" id="deleteModal" style="display: none">
+      <div class="modal-content">
+        <h3>¿Eliminar conversación?</h3>
+        <p style="margin-bottom: 20px; color: var(--text-secondary)">
+          Esta acción moverá el chat a la papelera.
+        </p>
+        <div class="modal-actions">
+          <button class="modal-btn cancel" id="cancelDeleteBtn">
+            Cancelar
+          </button>
+          <button
+            class="modal-btn confirm"
+            id="confirmDeleteBtn"
+            style="background: #dc3545"
+          >
+            Eliminar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Renombrar -->
+    <div class="modal-overlay" id="renameModal" style="display: none">
+      <div class="modal-content">
+        <h3>Renombrar chat</h3>
+        <input
+          type="text"
+          id="renameInput"
+          placeholder="Nuevo nombre..."
+          style="
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+          "
+        />
+        <div class="modal-actions">
+          <button class="modal-btn cancel" id="cancelRenameBtn">
+            Cancelar
+          </button>
+          <button class="modal-btn confirm" id="confirmRenameBtn">
+            Guardar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+  </body>
+</html>

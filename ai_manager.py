@@ -15,7 +15,8 @@ import google.generativeai as genai
 from config import (
     OPENROUTER_API_KEY, GEMINI_API_KEY,
     OPENROUTER_MODELS, GEMINI_MODELS,
-    AI_MAX_PDF_CONTEXT, AI_MAX_WEB_CONTEXT
+    AI_MAX_PDF_CONTEXT, AI_MAX_WEB_CONTEXT,
+    CACHE_FOLDER
 )
 
 # Clasificaciones
@@ -41,7 +42,7 @@ class AIManager:
     """Gestor V7 con Contexto Cruzado y Persistencia Híbrida."""
     
     OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-    CACHE_FILE = "back-end/cache/ai_response_cache.json"
+    CACHE_FILE = "cache/ai_response_cache.json"
     
     def __init__(self):
         self.openrouter_key = OPENROUTER_API_KEY
